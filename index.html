@@ -451,6 +451,15 @@
     box-shadow:var(--shadow);
   }
 
+  .cards-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(380px, 1fr));
+    gap:16px;
+  }
+  .cards-grid .card{ height:100%; }
+
+  #print-all-container{ display:none; }
+
   .card-header{
     position:relative;
     padding:22px 22px 20px;
@@ -578,6 +587,13 @@
   }
   .field-value{ font-size:14.5px; font-weight:600; color:var(--ink); display:flex; align-items:center; flex-wrap:wrap; gap:2px; }
   .field-value.mono{ font-family:'JetBrains Mono',monospace; font-size:13.5px; font-weight:500; }
+
+  .field-grid.on-dark{ margin-top:16px; }
+  .field-grid.on-dark .field-label{ color:rgba(255,255,255,0.68); }
+  .field-grid.on-dark .field-value{ color:#fff; }
+  .field-grid.on-dark .field-value .action-btn.tel{ background:rgba(255,255,255,0.18); color:#fff; border:none; }
+  .field-grid.on-dark .field-value .action-btn.wa{ background:rgba(37,211,102,0.34); color:#fff; }
+  .field-grid.on-dark .field-value .action-btn.mail{ background:rgba(255,255,255,0.18); color:#fff; }
 
   .missing-note{
     display:flex; gap:8px; align-items:flex-start;
@@ -722,7 +738,8 @@
     .shell{ padding:18px 14px 40px; }
     header{ align-items:stretch; }
     .header-actions{ flex-direction:column; }
-    .header-actions .download-btn, .header-actions .upload-btn{ justify-content:center; }
+    .header-actions .download-btn, .header-actions .upload-btn{ justify-content:center; width:100%; }
+    .header-actions #sync-settings-btn{ width:auto; align-self:flex-start; }
     .body-grid{ grid-template-columns:1fr; }
     .map-layout{ grid-template-columns:1fr; }
     .stats{ grid-template-columns:repeat(2,1fr); }
@@ -732,6 +749,10 @@
     .card-toprow{ flex-direction:column; align-items:flex-start; gap:10px; }
     .publicador-row{ align-items:flex-start; }
     .data-table{ min-width:900px; }
+    .cards-grid{ grid-template-columns:1fr; }
+    .card-area .print-btn{ width:100%; justify-content:center; margin-left:0 !important; }
+    .sync-panel-row{ flex-direction:column; align-items:stretch; }
+    .sync-panel-row input, .sync-panel-row .download-btn{ width:100%; }
   }
 
   @media (max-width: 420px){
@@ -746,9 +767,47 @@
     body *{ visibility:hidden; }
     #print-card, #print-card *{ visibility:visible; }
     #print-card{ position:absolute; top:0; left:0; width:100%; margin:0; }
+    #print-all-container, #print-all-container *{ visibility:visible; }
     .no-print{ display:none !important; }
+
+    * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
+
+    body.print-all #print-card{ display:none; }
+    body.print-all #print-all-container{
+      display:grid !important;
+      grid-template-columns:1fr 1fr;
+      gap:8mm;
+      position:absolute; top:0; left:0; width:100%; margin:0;
+    }
+    .pcard{
+      border:1px solid #C7CDD1;
+      border-left:5px solid var(--pcard-color, #0E7C6B);
+      border-radius:8px;
+      padding:11px 13px;
+      break-inside:avoid;
+      page-break-inside:avoid;
+      font-family:'Inter',sans-serif;
+      color:#111;
+      background:#fff;
+    }
+    .pcard-head{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:6px;
+      margin-bottom:7px; padding-bottom:6px; border-bottom:1px solid #E1E7EA;
+    }
+    .pcard-name{ font-family:'Manrope',sans-serif; font-weight:800; font-size:13px; line-height:1.25; color:#111; }
+    .pcard-badges{ display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .pcard-badge{ font-size:8.5px; font-weight:700; background:var(--pcard-tint, #EEF1F2); color:var(--pcard-color, #333); padding:2px 7px; border-radius:999px; white-space:nowrap; }
+    .pcard-status{ font-size:8.5px; font-weight:800; padding:2px 7px; border-radius:999px; background:#DCEFE7; color:#0A5B4E; white-space:nowrap; }
+    .pcard-status.pending{ background:#FBE3DC; color:#9A3B27; }
+    .pcard-section-title{
+      font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;
+      color:#9A3B27; margin:8px 0 4px;
+    }
+    .pcard-row{ font-size:10px; line-height:1.55; color:#222; }
+    .pcard-row b{ color:#555; font-weight:700; margin-right:4px; }
   }
 </style>
+
 </head>
 <body>
   <div class="shell">
@@ -761,6 +820,10 @@
         <button class="download-btn" id="download-btn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Descargar Excel (ordenado)</span>
+        </button>
+        <button class="download-btn" id="download-groups-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <span>Descargar Excel por grupos</span>
         </button>
         <button class="upload-btn" id="sync-toggle-btn" style="background:var(--teal-deep);">
           <svg id="sync-btn-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
@@ -839,7 +902,16 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             <span>Descargar tarjeta (PDF)</span>
           </button>
+          <button class="print-btn no-print" id="print-all-btn" style="display:none; margin-left:8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span>Descargar todas (PDF)</span>
+          </button>
+          <button class="print-btn no-print" id="toggle-all-btn" style="display:none; margin-left:8px; background:var(--ink); color:#fff;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span id="toggle-all-label">Ver todas las tarjetas</span>
+          </button>
           <div id="print-card"></div>
+          <div id="print-all-container"></div>
         </div>
       </div>
     </div>
@@ -902,7 +974,6 @@
 
   const WATCH_FIELDS = [
     { key: "correo_publicador", label: "Correo del publicador" },
-    { key: "telefono_alt", label: "Teléfono alternativo del contacto" },
     { key: "correo_contacto", label: "Correo del contacto de emergencia" }
   ];
 
@@ -913,7 +984,7 @@
     "Grupo 3": { place: "Norte",            lat: 14.749538635465926, lon: -91.14819323204807, color: "#2F6FD0" },
     "Grupo 4": { place: "Tzalá",            lat: 14.745180606644539, lon: -91.1478004431871,  color: "#C8830E" },
     "Grupo 5": { place: "Escuela Jucanyá",  lat: 14.736475348628497, lon: -91.15455504616244, color: "#7C5CBF" },
-    "Grupo 6": { place: "Jucanyá Sur",      lat: 14.73510165785497,  lon: -91.15096505620663, color: "#2E9E63" }
+    "Grupo 6": { place: "Jucanyá Sur",      lat: 14.73510165785497,  lon: -91.15096505620663, color: "#E0B32C" }
   };
   const GROUP_ORDER = ["Grupo 1","Grupo 2","Grupo 3","Grupo 4","Grupo 5","Grupo 6"];
 
@@ -928,11 +999,13 @@
     statusFilter: "todas",
     groupBy: "ninguno",   // ninguno | grupo | relacion
     grupoFilter: null,    // "Grupo 1" etc, set from the map
-    activeView: "fichero"
+    activeView: "fichero",
+    showAllCards: false
   };
 
   let map = null;
   let mapMarkers = {};
+  let individualLayer = null;
 
   // ---------- helpers ----------
   function esc(s){
@@ -946,11 +1019,18 @@
     return ((parts[0]?.[0]||"") + (parts[1]?.[0]||"")).toUpperCase();
   }
   function isInformed(r){ return /s[ií]/i.test(r.informado || ""); }
-  function missingFields(r){ return WATCH_FIELDS.filter(f => !r[f.key]); }
-  function completeness(r){
+  function missingFields(r){ return WATCH_FIELDS.filter(f => !r[f.key]); }  function completeness(r){
     const total = WATCH_FIELDS.length;
     const have = total - missingFields(r).length;
     return total === 0 ? 1 : have/total;
+  }
+  // acepta "grupo_1", "Grupo 1", "GRUPO1", "1", etc. y los deja todos como "Grupo 1"
+  function normalizeGrupo(v){
+    if(v == null) return "";
+    const s = String(v).trim();
+    if(!s) return "";
+    const m = s.match(/(\d+)/);
+    return m ? ("Grupo " + m[1]) : s;
   }
   function groupInfo(r){ return GROUP_LOCATIONS[r.numero_grupo] || null; }
   function digitsOnly(phone){ return String(phone||"").replace(/[^\d]/g, ""); }
@@ -998,7 +1078,7 @@
       .map((r,i) => ({
         id: r["_id"] || ("row-"+i),
         nombre_publicador: r[COLS.nombre_publicador] || "",
-        numero_grupo: r[COLS.numero_grupo] || "",
+        numero_grupo: normalizeGrupo(r[COLS.numero_grupo] || ""),
         telefono_publicador: r[COLS.telefono_publicador] || "",
         correo_publicador: r[COLS.correo_publicador] || "",
         nombre_contacto: r[COLS.nombre_contacto] || "",
@@ -1426,6 +1506,72 @@
   }
   document.getElementById("download-btn").addEventListener("click", exportToExcel);
 
+  // ---------- export to Excel, agrupado por número de grupo (1 → 6) ----------
+  function groupSortKey(r){
+    const m = String(r.numero_grupo || "").match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : 999;
+  }
+  function exportToExcelByGroup(){
+    const rows = getFiltered().slice().sort((a, b) => {
+      const ga = groupSortKey(a), gb = groupSortKey(b);
+      if(ga !== gb) return ga - gb;
+      return (a.nombre_publicador || "").localeCompare(b.nombre_publicador || "", "es");
+    });
+
+    const headers = [
+      "#","Nombre del publicador","Número de grupo","Teléfono del publicador","Correo del publicador",
+      "Nombre del contacto de emergencia","Relación con el publicador","Teléfono del contacto",
+      "Teléfono alternativo","Correo del contacto"
+    ];
+    const toRow = (r, i) => ({
+      "#": i + 1,
+      "Nombre del publicador": r.nombre_publicador,
+      "Número de grupo": r.numero_grupo,
+      "Teléfono del publicador": r.telefono_publicador,
+      "Correo del publicador": r.correo_publicador,
+      "Nombre del contacto de emergencia": r.nombre_contacto,
+      "Relación con el publicador": r.relacion,
+      "Teléfono del contacto": r.telefono_contacto,
+      "Teléfono alternativo": r.telefono_alt,
+      "Correo del contacto": r.correo_contacto
+    });
+    const cols = [
+      { wch:4 }, { wch:28 }, { wch:12 }, { wch:16 }, { wch:26 },
+      { wch:28 }, { wch:20 }, { wch:20 }, { wch:18 }, { wch:26 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+
+    // Hoja con todos, ordenados del Grupo 1 al 6
+    const wsAll = XLSX.utils.json_to_sheet(rows.map(toRow));
+    wsAll["!cols"] = cols;
+    styleSheet(wsAll, headers);
+    XLSX.utils.book_append_sheet(wb, wsAll, "Todos (Grupo 1-6)");
+
+    // Una hoja por cada grupo que tenga publicadores
+    GROUP_ORDER.forEach(key => {
+      const groupRows = rows.filter(r => r.numero_grupo === key);
+      if(groupRows.length === 0) return;
+      const ws = XLSX.utils.json_to_sheet(groupRows.map(toRow));
+      ws["!cols"] = cols;
+      styleSheet(ws, headers);
+      XLSX.utils.book_append_sheet(wb, ws, key);
+    });
+
+    // publicadores sin grupo reconocido, si los hay
+    const sinGrupo = rows.filter(r => !GROUP_LOCATIONS[r.numero_grupo]);
+    if(sinGrupo.length > 0){
+      const ws = XLSX.utils.json_to_sheet(sinGrupo.map(toRow));
+      ws["!cols"] = cols;
+      styleSheet(ws, headers);
+      XLSX.utils.book_append_sheet(wb, ws, "Sin grupo");
+    }
+
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `tarjetas_por_grupo_${stamp}.xlsx`);
+  }
+  document.getElementById("download-groups-btn").addEventListener("click", exportToExcelByGroup);
+
   // ---------- render: shared ----------
   function render(){
     renderStats();
@@ -1538,7 +1684,7 @@
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-id");
         const match = state.records.find(r => String(r.id) === id);
-        if(match){ state.selectedId = match.id; renderList(); renderCard(); }
+        if(match){ state.selectedId = match.id; state.showAllCards = false; renderList(); renderCard(); }
       });
     });
   }
@@ -1570,10 +1716,16 @@
             </span>
             <div>
               <div class="card-name">${esc(r.nombre_publicador)}</div>
-              <div class="contact-lines">
-                ${r.telefono_publicador ? `<span class="contact-line">${iconPhone()} ${esc(r.telefono_publicador)}${phoneActions(r.telefono_publicador)}</span>` : ""}
-                ${r.correo_publicador ? `<span class="contact-line">${iconMail()} ${esc(r.correo_publicador)}${mailActions(r.correo_publicador, r.nombre_publicador.split(" ")[0])}</span>` : ""}
-              </div>
+            </div>
+          </div>
+          <div class="field-grid on-dark">
+            <div>
+              <div class="field-label">Teléfono</div>
+              <div class="field-value">${r.telefono_publicador ? esc(r.telefono_publicador) : "—"}${phoneActions(r.telefono_publicador)}</div>
+            </div>
+            <div>
+              <div class="field-label">Correo electrónico</div>
+              <div class="field-value">${r.correo_publicador ? esc(r.correo_publicador) : "—"}${mailActions(r.correo_publicador, r.nombre_publicador.split(" ")[0])}</div>
             </div>
           </div>
         </div>
@@ -1609,12 +1761,6 @@
           </div>
         </div>
 
-        ${missing.length > 0 ? `
-        <div class="missing-note">
-          ${iconAlertTriangle()}
-          <span>Datos opcionales sin completar: <strong>${missing.map(f=>esc(f.label)).join(", ")}</strong>.</span>
-        </div>` : ""}
-
         <div class="card-footer">
           <span>Ficha ${typeof r.id === "number" ? ("N.º " + r.id) : esc(r.id)}</span>
           <span>${r.fecha ? esc(formatDate(r.fecha)) : ""}</span>
@@ -1623,10 +1769,57 @@
     `;
   }
 
+  function compactCardHtml(r){
+    const informed = isInformed(r);
+    const gi = groupInfo(r);
+    const color = gi ? gi.color : "#0E7C6B";
+    return `
+      <div class="pcard" style="--pcard-color:${color}; --pcard-tint:${color}22;">
+        <div class="pcard-head">
+          <div class="pcard-name">${esc(r.nombre_publicador)}</div>
+          <div class="pcard-badges">
+            ${r.numero_grupo ? `<span class="pcard-badge">${esc(r.numero_grupo)}</span>` : ""}
+            <span class="pcard-status ${informed ? "" : "pending"}">${informed ? "Informado" : "Pendiente"}</span>
+          </div>
+        </div>
+        <div class="pcard-row"><b>Tel:</b>${r.telefono_publicador ? esc(r.telefono_publicador) : "—"}</div>
+        <div class="pcard-row"><b>Correo:</b>${r.correo_publicador ? esc(r.correo_publicador) : "—"}</div>
+        <div class="pcard-section-title">Contacto de emergencia</div>
+        <div class="pcard-row"><b>Nombre:</b>${r.nombre_contacto ? esc(r.nombre_contacto) : "—"}${r.relacion ? " (" + esc(r.relacion) + ")" : ""}</div>
+        <div class="pcard-row"><b>Tel:</b>${r.telefono_contacto ? esc(r.telefono_contacto) : "—"}</div>
+        <div class="pcard-row"><b>Tel. alt:</b>${r.telefono_alt ? esc(r.telefono_alt) : "—"}</div>
+        <div class="pcard-row"><b>Correo:</b>${r.correo_contacto ? esc(r.correo_contacto) : "—"}</div>
+      </div>
+    `;
+  }
+
   function renderCard(){
     const filtered = getFiltered();
     const selected = state.records.find(r => r.id === state.selectedId) || filtered[0] || null;
     const printBtn = document.getElementById("print-btn");
+    const printAllBtn = document.getElementById("print-all-btn");
+    const toggleAllBtn = document.getElementById("toggle-all-btn");
+    const toggleAllLabel = document.getElementById("toggle-all-label");
+    printAllBtn.style.display = filtered.length > 0 ? "inline-flex" : "none";
+    toggleAllBtn.style.display = filtered.length > 0 ? "inline-flex" : "none";
+    toggleAllLabel.textContent = state.showAllCards ? "Ver tarjeta individual" : "Ver todas las tarjetas";
+
+    if(state.showAllCards){
+      printBtn.style.display = "none";
+      if(filtered.length > 0){
+        document.getElementById("print-card").innerHTML =
+          `<div class="cards-grid">${filtered.map(cardHtml).join("")}</div>`;
+      }else{
+        document.getElementById("print-card").innerHTML = `
+          <div class="empty-card">
+            ${iconUsers(28)}
+            <div class="empty-list">No hay tarjetas para mostrar con estos filtros.</div>
+          </div>
+        `;
+      }
+      return;
+    }
+
     if(selected){
       document.getElementById("print-card").innerHTML = cardHtml(selected);
       printBtn.style.display = "inline-flex";
@@ -1723,6 +1916,7 @@
   function focusGroup(key){
     state.grupoFilter = key;
     state.groupBy = "ninguno";
+    state.showAllCards = true;
     document.getElementById("group-by-select").value = "ninguno";
     setActiveView("fichero");
     const filtered = getFiltered();
@@ -1737,8 +1931,99 @@
       if(!marker) return;
       marker.bindPopup(popupHtmlFor(key));
     });
+    rebuildIndividualMarkers();
     // fix rendering size issues when the tab becomes visible
     setTimeout(() => { if(map) map.invalidateSize(); }, 50);
+  }
+
+  // coloca un punto por cada publicador, disperso DENTRO del polígono real
+  // de su grupo (no apilados en el centro). La posición es estable (mismo
+  // id → mismo lugar) para que no "salten" al refrescar los datos.
+  function hashStr(s){
+    let h = 0;
+    for(let i = 0; i < s.length; i++){ h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+    return h >>> 0;
+  }
+  function mulberry32(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function pointInRing(lat, lon, ring){
+    let inside = false;
+    for(let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+      const yi = ring[i][0], xi = ring[i][1];
+      const yj = ring[j][0], xj = ring[j][1];
+      const intersects = ((yi > lat) !== (yj > lat)) &&
+        (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+      if(intersects) inside = !inside;
+    }
+    return inside;
+  }
+  function pointInGroupPolygon(lat, lon, key){
+    const parts = GROUP_BOUNDARIES[key];
+    if(!parts) return false;
+    return parts.some(part => pointInRing(lat, lon, part));
+  }
+  const groupBboxCache = {};
+  function bboxForGroup(key){
+    if(groupBboxCache[key]) return groupBboxCache[key];
+    const parts = GROUP_BOUNDARIES[key];
+    if(!parts) return null;
+    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    parts.forEach(part => part.forEach(([lat, lon]) => {
+      if(lat < minLat) minLat = lat;
+      if(lat > maxLat) maxLat = lat;
+      if(lon < minLon) minLon = lon;
+      if(lon > maxLon) maxLon = lon;
+    }));
+    const box = { minLat, maxLat, minLon, maxLon };
+    groupBboxCache[key] = box;
+    return box;
+  }
+  function pointForRecord(r){
+    const key = r.numero_grupo;
+    const gi = GROUP_LOCATIONS[key];
+    if(!gi) return null;
+    const bbox = bboxForGroup(key);
+    if(!bbox) return [gi.lat, gi.lon];
+    const rng = mulberry32(hashStr(String(r.id)) ^ hashStr(key));
+    for(let attempt = 0; attempt < 60; attempt++){
+      const lat = bbox.minLat + rng() * (bbox.maxLat - bbox.minLat);
+      const lon = bbox.minLon + rng() * (bbox.maxLon - bbox.minLon);
+      if(pointInGroupPolygon(lat, lon, key)) return [lat, lon];
+    }
+    return [gi.lat, gi.lon]; // no cupo tras varios intentos: usa el centro
+  }
+  function rebuildIndividualMarkers(){
+    if(!map) return;
+    if(individualLayer) map.removeLayer(individualLayer);
+    individualLayer = L.layerGroup().addTo(map);
+    state.records.forEach(r => {
+      const gi = groupInfo(r);
+      if(!gi) return;
+      const pt = pointForRecord(r);
+      if(!pt) return;
+      const informed = isInformed(r);
+      const dot = L.circleMarker(pt, {
+        radius: 6,
+        weight: 2,
+        color: "#fff",
+        fillColor: informed ? gi.color : "#E15B41",
+        fillOpacity: 0.95
+      }).addTo(individualLayer);
+      dot.bindTooltip(esc(r.nombre_publicador), { direction: "top", offset: [0, -6] });
+      dot.on("click", () => {
+        state.selectedId = r.id;
+        state.showAllCards = false;
+        setActiveView("fichero");
+        render();
+      });
+    });
   }
 
   function renderLegend(){
@@ -1871,6 +2156,22 @@
   });
 
   document.getElementById("print-btn").addEventListener("click", () => window.print());
+
+  document.getElementById("toggle-all-btn").addEventListener("click", () => {
+    state.showAllCards = !state.showAllCards;
+    renderCard();
+  });
+
+  document.getElementById("print-all-btn").addEventListener("click", () => {
+    const rows = getFiltered();
+    if(rows.length === 0) return;
+    document.getElementById("print-all-container").innerHTML = rows.map(compactCardHtml).join("");
+    document.body.classList.add("print-all");
+    window.print();
+  });
+  window.addEventListener("afterprint", () => {
+    document.body.classList.remove("print-all");
+  });
 
   render();
 })();
