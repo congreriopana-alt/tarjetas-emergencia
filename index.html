@@ -1445,7 +1445,9 @@
   }
 
   function exportToExcel(){
-    const rows = getFiltered();
+    // Este botón siempre exporta TODOS los publicadores (grupos 1-6), sin
+    // importar si hay un grupo seleccionado o algún filtro activo en pantalla.
+    const rows = state.records;
 
     // Hoja 1: datos limpios del publicador (sin Estado / Datos incompletos / Fecha de envío)
     const mainHeaders = [
