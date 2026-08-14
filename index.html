@@ -1520,7 +1520,9 @@
     return m ? parseInt(m[1], 10) : 999;
   }
   function exportToExcelByGroup(){
-    const rows = getFiltered().slice().sort((a, b) => {
+    // Igual que el Excel ordenado: siempre exporta TODOS los publicadores,
+    // sin importar ningún filtro o grupo seleccionado en pantalla.
+    const rows = state.records.slice().sort((a, b) => {
       const ga = groupSortKey(a), gb = groupSortKey(b);
       if(ga !== gb) return ga - gb;
       return (a.nombre_publicador || "").localeCompare(b.nombre_publicador || "", "es");
