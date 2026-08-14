@@ -736,10 +736,12 @@
 
   @media (max-width: 760px){
     .shell{ padding:18px 14px 40px; }
-    header{ align-items:stretch; }
-    .header-actions{ flex-direction:column; }
-    .header-actions .download-btn, .header-actions .upload-btn{ justify-content:center; width:100%; }
-    .header-actions #sync-settings-btn{ width:auto; align-self:flex-start; }
+    header{ align-items:center; text-align:center; }
+    header > div:first-child{ width:100%; }
+    .eyebrow{ justify-content:center; }
+    .header-actions{ width:100%; justify-content:center; }
+    .header-actions .download-btn, .header-actions .upload-btn{ justify-content:center; }
+    .header-actions #sync-settings-btn{ width:auto; }
     .body-grid{ grid-template-columns:1fr; }
     .map-layout{ grid-template-columns:1fr; }
     .stats{ grid-template-columns:repeat(2,1fr); }
