@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tarjetas de contacto de emergencia</title>
+<!-- ============ Instalable como app en el teléfono (PWA-lite) ============ -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0E7C6B" />
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Tarjetas" />
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EFF3F4;
+    --surface:#FFFFFF;
+    --surface-2:#F7F9FA;
+    --ink:#0F1720;
+    --ink-2:#4C5A64;
+    --ink-3:#93A1AA;
+    --border:#E1E7EA;
+    --teal:#0E7C6B;
+    --teal-deep:#0A5B4E;
+    --teal-tint:#E4F3F0;
+    --coral:#E15B41;
+    --coral-tint:#FCEAE5;
+    --amber:#C8830E;
+    --amber-tint:#FBF0DD;
+    --shadow: 0 1px 2px rgba(15,23,32,0.04), 0 8px 24px -12px rgba(15,23,32,0.12);
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 9px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(15,23,32,0.055) 1px, transparent 0);
+    background-size:22px 22px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .shell{
+    position:relative;
+    z-index:1;
+    max-width:1080px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+  }
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--teal);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .eyebrow .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--teal);
+    box-shadow:0 0 0 4px var(--teal-tint);
+  }
+  h1{
+    font-family:'Manrope',sans-serif;
+    font-weight:800;
+    font-size:clamp(24px,3.2vw,32px);
+    letter-spacing:-0.02em;
+    margin:0;
+    color:var(--ink);
+  }
+  .header-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .download-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--surface);
+    color:var(--teal-deep);
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:13.5px;
+    padding:11px 16px;
+    border-radius:12px;
+    cursor:pointer;
+    border:1px solid var(--border);
+    box-shadow:var(--shadow);
+    transition:transform .15s ease, background .15s ease;
+  }
+  .download-btn:hover{ background:var(--teal-tint); transform:translateY(-1px); }
+  .upload-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    background:var(--ink);
+    color:#fff;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    padding:11px 16px;
+    border-radius:12px;
+    cursor:pointer;
+    border:none;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .upload-btn:hover{ background:var(--teal-deep); transform:translateY(-1px); }
+  .upload-btn input{display:none;}
+  .status-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:#3ED598;
+    box-shadow:0 0 0 3px rgba(62,213,152,0.35);
+    display:inline-block;
+  }
+  #sync-toggle-btn.connected{ background:#1F7A52; }
+  #sync-toggle-btn.connected:hover{ background:#186040; }
+  #sync-toggle-btn.err{ background:var(--coral); }
+
+  #sync-panel{
+    display:none;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    box-shadow:var(--shadow);
+    padding:14px 16px;
+    margin-bottom:16px;
+  }
+  #sync-panel.show{ display:block; }
+  .sync-panel-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .sync-panel-row input{
+    flex:1 1 280px;
+    min-width:220px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:var(--surface-2);
+    color:var(--ink);
+  }
+  .sync-panel-row .download-btn{ padding:10px 14px; }
+  #sync-panel .note-line{
+    font-family:'Inter',sans-serif;
+    font-size:11.5px;
+    color:var(--ink-2);
+    line-height:1.5;
+    margin-top:8px;
+  }
+  #sync-notice{
+    display:none;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    padding:10px 12px;
+    border-radius:var(--radius-sm);
+    margin-top:10px;
+    border:1px solid var(--border);
+  }
+  #sync-notice.show{ display:block; }
+  #sync-notice.ok{ background:var(--teal-tint); color:var(--teal-deep); border-color:transparent; }
+  #sync-notice.err{ background:var(--coral-tint); color:#9A3B27; border-color:transparent; }
+
+  /* ---------- stats ---------- */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .stat-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:14px 16px;
+    box-shadow:var(--shadow);
+  }
+  .stat-value{
+    font-family:'Manrope',sans-serif;
+    font-weight:800;
+    font-size:24px;
+    letter-spacing:-0.02em;
+    line-height:1.1;
+    color:var(--ink);
+  }
+  .stat-value.warn{ color:var(--coral); }
+  .stat-label{
+    font-size:11.5px;
+    color:var(--ink-2);
+    margin-top:4px;
+  }
+
+  /* ---------- view tabs ---------- */
+  .view-tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .view-tab{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:10px 18px;
+    border-radius:12px;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:13.5px;
+    cursor:pointer;
+    border:1px solid var(--border);
+    background:var(--surface);
+    color:var(--ink-2);
+    box-shadow:var(--shadow);
+  }
+  .view-tab.active{ background:var(--ink); border-color:var(--ink); color:#fff; }
+  .view-panel{ display:none; }
+  .view-panel.active{ display:block; }
+
+  /* ---------- body layout (fichero) ---------- */
+  .body-grid{
+    display:grid;
+    grid-template-columns:280px 1fr;
+    gap:16px;
+    align-items:start;
+  }
+
+  .catalog{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:14px;
+    box-shadow:var(--shadow);
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .search-wrap{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:11px;
+    padding:10px 12px;
+  }
+  .search-wrap svg{ flex-shrink:0; color:var(--ink-3);}
+  .search-wrap input{
+    border:none;outline:none;background:transparent;
+    font-family:'Inter',sans-serif; font-size:13.5px; color:var(--ink); width:100%;
+  }
+
+  .filter-row{ display:flex; gap:6px; }
+  .filter-chip{
+    flex:1;
+    font-family:'Inter',sans-serif;
+    font-size:11.5px;
+    font-weight:700;
+    padding:7px 6px;
+    border-radius:9px;
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--ink-2);
+    cursor:pointer;
+    transition:all .12s ease;
+  }
+  .filter-chip.active{ background:var(--ink); border-color:var(--ink); color:#fff; }
+
+  .group-by-row{
+    display:flex; align-items:center; gap:8px;
+    font-size:11.5px; color:var(--ink-2); font-weight:600;
+  }
+  .group-by-row select{
+    flex:1;
+    font-family:'Inter',sans-serif;
+    font-size:12px; font-weight:600; color:var(--ink);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:6px 8px;
+    background:var(--surface-2);
+  }
+
+  .active-filter-pill{
+    display:none;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    background:var(--teal-tint);
+    color:var(--teal-deep);
+    font-size:11.5px;
+    font-weight:700;
+    padding:7px 10px;
+    border-radius:9px;
+  }
+  .active-filter-pill.show{ display:flex; }
+  .active-filter-pill button{
+    background:none; border:none; cursor:pointer; color:inherit;
+    font-size:14px; line-height:1; padding:0 2px;
+  }
+
+  .grupo-chip-label{
+    font-size:11.5px; color:var(--ink-2); font-weight:600; margin-top:-2px;
+  }
+  .grupo-chip-row{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:6px;
+  }
+  .grupo-chip{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+    padding:7px 4px;
+    border-radius:9px;
+    border:1px solid var(--border);
+    background:var(--surface-2);
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  .grupo-chip .dot{ width:9px; height:9px; border-radius:50%; }
+  .grupo-chip .label{ font-size:10.5px; font-weight:700; color:var(--ink); }
+  .grupo-chip.active{ background:var(--ink); border-color:var(--ink); }
+  .grupo-chip.active .label{ color:#fff; }
+
+  .tab-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:480px;
+    overflow-y:auto;
+    padding-right:2px;
+  }
+  .group-header{
+    display:flex;
+    justify-content:space-between;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--ink-3);
+    padding:8px 6px 4px;
+    border-bottom:1px solid var(--border);
+    margin-top:4px;
+  }
+  .tab-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    text-align:left;
+    background:transparent;
+    border:1px solid transparent;
+    border-radius:12px;
+    padding:8px;
+    cursor:pointer;
+    transition:background .12s ease, border-color .12s ease;
+  }
+  .tab-item:hover{ background:var(--surface-2); }
+  .tab-item.active{ background:var(--ink); }
+  .tab-item.active .tab-name{ color:#fff; }
+  .tab-item.active .tab-sub{ color:#B9C2C8; }
+
+  .ring{ position:relative; width:34px; height:34px; flex-shrink:0; }
+  .ring svg{ transform:rotate(-90deg); }
+  .ring-avatar{
+    position:absolute; inset:4px;
+    border-radius:50%;
+    background:var(--teal-tint);
+    color:var(--teal-deep);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:10.5px;
+  }
+  .tab-item.active .ring-avatar{ background:rgba(255,255,255,0.14); color:#fff; }
+
+  .tab-text{ display:flex; flex-direction:column; min-width:0; flex:1; }
+  .tab-warn{ flex-shrink:0; color:var(--amber); display:flex; }
+  .tab-item.active .tab-warn{ color:#F4C86A; }
+  .tab-name{
+    font-size:13px; font-weight:700; color:var(--ink);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .tab-sub{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--ink-2); margin-top:1px;
+  }
+
+  .empty-list{
+    font-size:12.5px; color:var(--ink-2); text-align:center; padding:22px 10px;
+  }
+
+  /* ---------- card area ---------- */
+  .card-area{}
+  .print-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    font-family:'Inter',sans-serif;
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--teal-deep);
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:11px;
+    padding:8px 13px;
+    margin-bottom:10px;
+    cursor:pointer;
+    box-shadow:var(--shadow);
+  }
+  .print-btn:hover{ background:var(--teal-tint); }
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+
+  .cards-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(380px, 1fr));
+    gap:16px;
+  }
+  .cards-grid .card{ height:100%; }
+
+  #print-all-container{ display:none; }
+
+  .card-header{
+    position:relative;
+    padding:22px 22px 20px;
+    background:
+      radial-gradient(120% 140% at 100% 0%, rgba(255,255,255,0.10), transparent 55%),
+      linear-gradient(135deg, var(--teal-deep), var(--teal) 70%);
+    color:#fff;
+  }
+  .card-toprow{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .card-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; letter-spacing:0.12em; text-transform:uppercase;
+    color:rgba(255,255,255,0.75);
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  }
+  .grupo-badge{
+    display:inline-flex; align-items:center; gap:5px;
+    background:rgba(255,255,255,0.18);
+    padding:2px 9px;
+    border-radius:999px;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    text-transform:none;
+    letter-spacing:0;
+    color:#fff;
+  }
+  .grupo-badge .dot{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
+  .publicador-row{ display:flex; align-items:center; gap:16px; }
+
+  .big-ring{ position:relative; width:64px; height:64px; flex-shrink:0; }
+  .big-ring svg{ transform:rotate(-90deg); }
+  .big-ring-avatar{
+    position:absolute; inset:6px; border-radius:50%;
+    background:rgba(255,255,255,0.16);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Manrope',sans-serif; font-weight:800; font-size:18px;
+  }
+
+  .card-name{
+    font-family:'Manrope',sans-serif; font-weight:800; font-size:19px;
+    letter-spacing:-0.01em; line-height:1.25;
+  }
+  .contact-lines{ display:flex; flex-direction:column; gap:6px; margin-top:9px; }
+  .contact-line{
+    display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:rgba(255,255,255,0.9);
+  }
+
+  .action-btns{ display:inline-flex; gap:5px; }
+  .action-btn{
+    display:inline-flex; align-items:center; gap:4px;
+    font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700;
+    text-decoration:none;
+    padding:4px 8px;
+    border-radius:999px;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .action-btn:hover{ transform:translateY(-1px); filter:brightness(1.04); }
+  .action-btn span{ display:none; }
+  .action-btn.wa span, .action-btn.mail span{ display:inline; }
+
+  .field-value .action-btns{ vertical-align:middle; }
+  .field-value .action-btn.tel{ background:var(--surface-2); color:var(--ink-2); border:1px solid var(--border); }
+  .field-value .action-btn.wa{ background:#E7F7EF; color:#0E8F4F; }
+  .field-value .action-btn.mail{ background:var(--teal-tint); color:var(--teal-deep); }
+
+  .contact-line .action-btn{ background:rgba(255,255,255,0.16); color:#fff; }
+  .contact-line .action-btn.wa{ background:rgba(37,211,102,0.32); }
+
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; flex-shrink:0;
+    background:rgba(255,255,255,0.16);
+    padding:6px 12px 6px 10px;
+    border-radius:999px;
+    font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700;
+  }
+  .status-pill.pending{ background:rgba(225,91,65,0.28); }
+
+  .relation-strip{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    gap:8px;
+    padding:12px 22px;
+    background:var(--surface-2);
+    border-bottom:1px solid var(--border);
+    font-family:'Inter',sans-serif; font-size:12.5px; color:var(--ink-2);
+  }
+  .relation-strip b{ color:var(--ink); font-weight:700; }
+  .link-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; font-weight:600;
+    color:var(--teal-deep);
+    background:var(--teal-tint);
+    padding:3px 9px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+
+  .card-body{ padding:20px 24px 8px; }
+  .section-label{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--coral);
+    background:var(--coral-tint);
+    padding:5px 10px;
+    border-radius:8px;
+    margin-bottom:16px;
+  }
+
+  .field-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px 22px;
+  }
+  .field-label{
+    font-size:10.5px; color:var(--ink-2); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px;
+  }
+  .field-value{ font-size:14.5px; font-weight:600; color:var(--ink); display:flex; align-items:center; flex-wrap:wrap; gap:2px; }
+  .field-value.mono{ font-family:'JetBrains Mono',monospace; font-size:13.5px; font-weight:500; }
+
+  .field-grid.on-dark{ margin-top:16px; }
+  .field-grid.on-dark .field-label{ color:rgba(255,255,255,0.68); }
+  .field-grid.on-dark .field-value{ color:#fff; }
+  .field-grid.on-dark .field-value .action-btn.tel{ background:rgba(255,255,255,0.18); color:#fff; border:none; }
+  .field-grid.on-dark .field-value .action-btn.wa{ background:rgba(37,211,102,0.34); color:#fff; }
+  .field-grid.on-dark .field-value .action-btn.mail{ background:rgba(255,255,255,0.18); color:#fff; }
+
+  .missing-note{
+    display:flex; gap:8px; align-items:flex-start;
+    background:var(--amber-tint); color:#8A5B0C;
+    font-size:12px; line-height:1.5;
+    margin:18px 24px 0;
+    padding:10px 12px;
+    border-radius:var(--radius-sm);
+  }
+  .missing-note svg{ flex-shrink:0; margin-top:1px; }
+
+  .card-footer{
+    display:flex; justify-content:space-between;
+    border-top:1px dashed var(--border);
+    margin:16px 24px 0;
+    padding:12px 0 18px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--ink-2);
+  }
+
+  .empty-card{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; min-height:400px; color:var(--ink-3);
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+    box-shadow:var(--shadow);
+  }
+
+  /* ---------- map view ---------- */
+  .map-layout{
+    display:grid;
+    grid-template-columns:1fr 280px;
+    gap:16px;
+    align-items:start;
+  }
+  #map{
+    height:560px;
+    border-radius:var(--radius-lg);
+    overflow:hidden;
+    box-shadow:var(--shadow);
+    border:1px solid var(--border);
+  }
+  .map-legend{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow);
+    padding:14px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .map-legend-title{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-3); margin-bottom:2px;
+  }
+  .legend-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 8px;
+    border-radius:10px;
+    cursor:pointer;
+    border:1px solid transparent;
+  }
+  .legend-item:hover{ background:var(--surface-2); border-color:var(--border); }
+  .legend-dot{ width:12px; height:12px; border-radius:50%; flex-shrink:0; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.15); }
+  .legend-text{ display:flex; flex-direction:column; min-width:0; flex:1; }
+  .legend-name{ font-size:12.5px; font-weight:700; color:var(--ink); }
+  .legend-sub{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--ink-2); }
+
+  .leaflet-popup-content-wrapper{ border-radius:12px; }
+  .popup-title{ font-family:'Manrope',sans-serif; font-weight:800; font-size:13.5px; margin-bottom:4px; }
+  .popup-stats{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-2); margin-bottom:6px; }
+  .popup-link{
+    display:inline-block; font-size:11.5px; font-weight:700; color:var(--teal-deep);
+    text-decoration:none; border-bottom:1px solid var(--teal-deep);
+  }
+
+  /* ---------- data table (below the map) ---------- */
+  .data-table-wrap{
+    margin-top:16px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow);
+    padding:14px;
+  }
+  .data-table-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .data-table-count{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--ink-2);
+  }
+  .table-scroll{ overflow-x:auto; }
+  .data-table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:1000px;
+    font-size:12.5px;
+  }
+  .data-table th{
+    position:sticky; top:0;
+    text-align:left;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--ink-2);
+    background:var(--surface-2);
+    padding:9px 10px;
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  .data-table td{
+    padding:9px 10px;
+    border-bottom:1px solid var(--border);
+    color:var(--ink);
+    white-space:nowrap;
+  }
+  .data-table tbody tr:hover{ background:var(--surface-2); }
+  .data-table .badge{
+    display:inline-flex; align-items:center; gap:5px;
+    font-weight:700; font-size:11px;
+    padding:3px 8px; border-radius:999px;
+  }
+  .data-table .badge.ok{ background:var(--teal-tint); color:var(--teal-deep); }
+  .data-table .badge.pending{ background:var(--coral-tint); color:#9A3B27; }
+  .data-table .cell-muted{ color:var(--ink-3); }
+
+  @media (max-width: 980px){
+    .body-grid{ grid-template-columns:240px 1fr; }
+    .map-layout{ grid-template-columns:1fr; }
+  }
+
+  @media (max-width: 760px){
+    .shell{ padding:18px 14px 40px; }
+    header{ align-items:center; text-align:center; }
+    header > div:first-child{ width:100%; }
+    .eyebrow{ justify-content:center; }
+    .header-actions{ width:100%; justify-content:center; }
+    .header-actions .download-btn, .header-actions .upload-btn{ justify-content:center; }
+    .header-actions #sync-settings-btn{ width:auto; }
+    .body-grid{ grid-template-columns:1fr; }
+    .map-layout{ grid-template-columns:1fr; }
+    .stats{ grid-template-columns:repeat(2,1fr); }
+    .field-grid{ grid-template-columns:1fr; }
+    #map{ height:360px; }
+    .tab-list{ max-height:320px; }
+    .card-toprow{ flex-direction:column; align-items:center; text-align:center; gap:10px; }
+    .card-eyebrow{ justify-content:center; }
+    .publicador-row{ flex-direction:column; align-items:center; text-align:center; gap:10px; }
+    .card-name{ text-align:center; }
+    .field-grid.on-dark{ text-align:center; justify-items:center; }
+    .relation-strip{ flex-direction:column; text-align:center; gap:6px; }
+    .data-table{ min-width:900px; }
+    .cards-grid{ grid-template-columns:1fr; }
+    .card-area .print-btn{ width:100%; justify-content:center; margin-left:0 !important; }
+    .sync-panel-row{ flex-direction:column; align-items:stretch; }
+    .sync-panel-row input, .sync-panel-row .download-btn{ width:100%; }
+  }
+
+  @media (max-width: 420px){
+    .stats{ grid-template-columns:1fr 1fr; }
+    .stat-value{ font-size:20px; }
+    .grupo-chip-row{ grid-template-columns:repeat(3,1fr); }
+    h1{ font-size:22px; }
+  }
+
+  @media print{
+    body::before{ display:none; }
+    body *{ visibility:hidden; }
+    #print-card, #print-card *{ visibility:visible; }
+    #print-card{ position:absolute; top:0; left:0; width:100%; margin:0; }
+    #print-all-container, #print-all-container *{ visibility:visible; }
+    .no-print{ display:none !important; }
+
+    * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
+
+    body.print-all #print-card{ display:none; }
+    body.print-all #print-all-container{
+      display:grid !important;
+      grid-template-columns:1fr 1fr;
+      gap:8mm;
+      position:absolute; top:0; left:0; width:100%; margin:0;
+    }
+    .pcard{
+      border:1px solid #C7CDD1;
+      border-left:5px solid var(--pcard-color, #0E7C6B);
+      border-radius:8px;
+      padding:11px 13px;
+      break-inside:avoid;
+      page-break-inside:avoid;
+      font-family:'Inter',sans-serif;
+      color:#111;
+      background:#fff;
+    }
+    .pcard-head{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:6px;
+      margin-bottom:7px; padding-bottom:6px; border-bottom:1px solid #E1E7EA;
+    }
+    .pcard-name{ font-family:'Manrope',sans-serif; font-weight:800; font-size:13px; line-height:1.25; color:#111; }
+    .pcard-badges{ display:flex; gap:4px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+    .pcard-badge{ font-size:8.5px; font-weight:700; background:var(--pcard-tint, #EEF1F2); color:var(--pcard-color, #333); padding:2px 7px; border-radius:999px; white-space:nowrap; }
+    .pcard-status{ font-size:8.5px; font-weight:800; padding:2px 7px; border-radius:999px; background:#DCEFE7; color:#0A5B4E; white-space:nowrap; }
+    .pcard-status.pending{ background:#FBE3DC; color:#9A3B27; }
+    .pcard-section-title{
+      font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;
+      color:#9A3B27; margin:8px 0 4px;
+    }
+    .pcard-row{ font-size:10px; line-height:1.55; color:#222; }
+    .pcard-row b{ color:#555; font-weight:700; margin-right:4px; }
+  }
+</style>
+
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div>
+        <div class="eyebrow"><span class="dot"></span>Fichero de la congregación</div>
+        <h1>Tarjetas de contacto de emergencia</h1>
+      </div>
+      <div class="header-actions">
+        <button class="download-btn" id="download-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Descargar Excel (ordenado)</span>
+        </button>
+        <button class="download-btn" id="download-groups-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <span>Descargar Excel por grupos</span>
+        </button>
+        <button class="upload-btn" id="sync-toggle-btn" style="background:var(--teal-deep);">
+          <svg id="sync-btn-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          <span class="status-dot" id="sync-btn-dot" style="display:none;"></span>
+          <span id="sync-btn-label">Google Sheet en vivo</span>
+        </button>
+        <button class="upload-btn" id="sync-settings-btn" title="Configurar Google Sheet en vivo" style="background:var(--ink); padding:11px 12px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="sync-panel">
+      <div class="sync-panel-row">
+        <input type="text" id="sheet-url-input" placeholder="Enlace de Google Sheets (Compartir → Copiar enlace)" value="https://docs.google.com/spreadsheets/d/1L60gkALHWWCISmSIFLk9oZqS6ox2tb22XXLehAPr8Wg/edit?usp=sharing" />
+        <input type="text" id="sheet-tab-input" placeholder="Nombre de la pestaña" value="kobo_data" style="max-width:180px;" />
+        <button class="download-btn" id="sheet-connect-btn">Conectar</button>
+        <button class="download-btn" id="sheet-refresh-btn" style="display:none;">Actualizar ahora</button>
+        <button class="download-btn" id="sheet-disconnect-btn" style="display:none;">Desconectar</button>
+        <button class="download-btn" id="sheet-debug-btn">Ver columnas del Sheet</button>
+      </div>
+      <div class="note-line">La hoja debe estar compartida como "Cualquiera con el enlace: Lector" (botón Compartir en Google Sheets). No hace falta token ni desplegar nada en Apps Script.</div>
+      <div id="sync-notice"></div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="view-tabs">
+      <button class="view-tab active" data-view="fichero">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Fichero
+      </button>
+      <button class="view-tab" data-view="mapa">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        Mapa por grupo
+      </button>
+    </div>
+
+    <!-- ---------- FICHERO VIEW ---------- -->
+    <div class="view-panel active" id="view-fichero">
+      <div class="body-grid">
+        <div class="catalog">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="search-input" placeholder="Buscar publicador o contacto…" />
+          </div>
+
+          <div class="filter-row" id="filter-row">
+            <button class="filter-chip active" data-filter="todas">Todas</button>
+            <button class="filter-chip" data-filter="informado">Informado</button>
+            <button class="filter-chip" data-filter="pendiente">Pendiente</button>
+          </div>
+
+          <div class="group-by-row">
+            <span>Agrupar por</span>
+            <select id="group-by-select">
+              <option value="ninguno">Sin agrupar</option>
+              <option value="grupo">Número de grupo</option>
+              <option value="relacion">Relación</option>
+            </select>
+          </div>
+
+          <div class="grupo-chip-label">Filtrar por grupo</div>
+          <div class="grupo-chip-row" id="grupo-chip-row"></div>
+
+          <div class="active-filter-pill" id="grupo-filter-pill">
+            <span id="grupo-filter-label"></span>
+            <button id="grupo-filter-clear" title="Quitar filtro">✕</button>
+          </div>
+
+          <div class="tab-list" id="tab-list"></div>
+        </div>
+
+        <div class="card-area">
+          <button class="print-btn no-print" id="print-btn" style="display:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            <span>Descargar tarjeta (PDF)</span>
+          </button>
+          <button class="print-btn no-print" id="print-all-btn" style="display:none; margin-left:8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span>Descargar todas (PDF)</span>
+          </button>
+          <button class="print-btn no-print" id="toggle-all-btn" style="display:none; margin-left:8px; background:var(--ink); color:#fff;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span id="toggle-all-label">Ver todas las tarjetas</span>
+          </button>
+          <div id="print-card"></div>
+          <div id="print-all-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- MAPA VIEW ---------- -->
+    <div class="view-panel" id="view-mapa">
+      <div class="map-layout">
+        <div id="map"></div>
+        <div class="map-legend">
+          <div class="map-legend-title">Grupos de servicio</div>
+          <div id="legend-list"></div>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <div class="data-table-head">
+          <div class="map-legend-title" style="margin:0;">Datos (igual que el Excel descargado)</div>
+          <span class="data-table-count" id="data-table-count"></span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="data-table"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  const SEED = [
+    {
+      id: 838047071,
+      nombre_publicador: "Juan Matheo Queché Mejía",
+      numero_grupo: "Grupo 1",
+      telefono_publicador: "4049 7577",
+      correo_publicador: "juanmateoqueche@gmail.com",
+      nombre_contacto: "Miguel Queché",
+      relacion: "Padre o madre",
+      telefono_contacto: "+502 5954 2231",
+      telefono_alt: "77621062",
+      correo_contacto: "miquebu@yahoo.com",
+      informado: "Sí, ya se lo he informado",
+      fecha: "2026-08-12T17:32:23"
+    }
+  ];
+
+  const COLS = {
+    nombre_publicador: "Nombre completo del publicador",
+    numero_grupo: "Número de grupo",
+    telefono_publicador: "Número de teléfono",
+    correo_publicador: "Correo electrónico",
+    nombre_contacto: "Nombre completo del contacto de emergencia",
+    relacion: "Relación con el publicador",
+    telefono_contacto: "Número de teléfono del contacto de emergencia",
+    telefono_alt: "Número de teléfono alternativo",
+    correo_contacto: "Correo electrónico del contacto de emergencia",
+    informado: "¿Le ha dicho a su contacto de emergencia que los ancianos tendrán esta información y podrían contactar con él en una emergencia?"
+  };
+
+  const WATCH_FIELDS = [
+    { key: "correo_publicador", label: "Correo del publicador" },
+    { key: "correo_contacto", label: "Correo del contacto de emergencia" }
+  ];
+
+  // group -> place name / coordinates (centroid of each zone polygon) + color
+  const GROUP_LOCATIONS = {
+    "Grupo 1": { place: "Centro",           lat: 14.740862639326593, lon: -91.1579089617737,  color: "#0E7C6B" },
+    "Grupo 2": { place: "Market",           lat: 14.749085949117932, lon: -91.1648852917666,  color: "#E15B41" },
+    "Grupo 3": { place: "Norte",            lat: 14.749538635465926, lon: -91.14819323204807, color: "#2F6FD0" },
+    "Grupo 4": { place: "Tzalá",            lat: 14.745180606644539, lon: -91.1478004431871,  color: "#C8830E" },
+    "Grupo 5": { place: "Escuela Jucanyá",  lat: 14.736475348628497, lon: -91.15455504616244, color: "#7C5CBF" },
+    "Grupo 6": { place: "Jucanyá Sur",      lat: 14.73510165785497,  lon: -91.15096505620663, color: "#E0B32C" }
+  };
+  const GROUP_ORDER = ["Grupo 1","Grupo 2","Grupo 3","Grupo 4","Grupo 5","Grupo 6"];
+
+  // boundary lines for each group's zone (simplified from GRUPOS.json, converted to lat/lon).
+  // Each group can have more than one separate polygon part (e.g. Grupo 2 has two disconnected pieces).
+  const GROUP_BOUNDARIES = {"Grupo 1":[[[14.737822,-91.160702],[14.739183,-91.162382],[14.739299,-91.162323],[14.739729,-91.162607],[14.739874,-91.162599],[14.740514,-91.163205],[14.741512,-91.163036],[14.741702,-91.163371],[14.742066,-91.163628],[14.74286,-91.163936],[14.743436,-91.163741],[14.743629,-91.163532],[14.743774,-91.163592],[14.744047,-91.163443],[14.744121,-91.163099],[14.743241,-91.161945],[14.743246,-91.161449],[14.744251,-91.155426],[14.744197,-91.154666],[14.744727,-91.153637],[14.745076,-91.153291],[14.743698,-91.151372],[14.743404,-91.151413],[14.742973,-91.15173],[14.742499,-91.151685],[14.74163,-91.15233],[14.741588,-91.152703],[14.741962,-91.152887],[14.741969,-91.152996],[14.741121,-91.1537],[14.740156,-91.153966],[14.739499,-91.154454],[14.737611,-91.156214],[14.73728,-91.156432],[14.735929,-91.157772],[14.735289,-91.158482],[14.735243,-91.158744],[14.735014,-91.158977],[14.735704,-91.15924],[14.736192,-91.159535],[14.736443,-91.15983],[14.736611,-91.159686],[14.736867,-91.160264],[14.737582,-91.160684],[14.737822,-91.160702]]],"Grupo 3":[[[14.753359,-91.143056],[14.753092,-91.142752],[14.752444,-91.143829],[14.751772,-91.144553],[14.751468,-91.145009],[14.749945,-91.146248],[14.749123,-91.146736],[14.74742,-91.14808],[14.746055,-91.148926],[14.745326,-91.149522],[14.746252,-91.151946],[14.746341,-91.152033],[14.746843,-91.151909],[14.747167,-91.151987],[14.746874,-91.152441],[14.746366,-91.152696],[14.746623,-91.153574],[14.747011,-91.153408],[14.747414,-91.153385],[14.747593,-91.15324],[14.747719,-91.153291],[14.748581,-91.153064],[14.748414,-91.152313],[14.748028,-91.151903],[14.748018,-91.151071],[14.748262,-91.150514],[14.748872,-91.149857],[14.749508,-91.149919],[14.749628,-91.149809],[14.749896,-91.149938],[14.750044,-91.149916],[14.750922,-91.149044],[14.751272,-91.148522],[14.751285,-91.148162],[14.75137,-91.148019],[14.751881,-91.147718],[14.752015,-91.147538],[14.752449,-91.146712],[14.752678,-91.145851],[14.753696,-91.144492],[14.754049,-91.143839],[14.754428,-91.144234],[14.754485,-91.144144],[14.754742,-91.143098],[14.754545,-91.142635],[14.753842,-91.142945],[14.753359,-91.143056]]],"Grupo 2":[[[14.748554,-91.153103],[14.747717,-91.15331],[14.747604,-91.153262],[14.747401,-91.153413],[14.747045,-91.153435],[14.746628,-91.153624],[14.746351,-91.152666],[14.746836,-91.152396],[14.747059,-91.152071],[14.74686,-91.151963],[14.746302,-91.152075],[14.746226,-91.152002],[14.745294,-91.149605],[14.744706,-91.15001],[14.74377,-91.151386],[14.745099,-91.153329],[14.74484,-91.153583],[14.74429,-91.154701],[14.744351,-91.155449],[14.74331,-91.161486],[14.743512,-91.161373],[14.743832,-91.160761],[14.743995,-91.16078],[14.74441,-91.15997],[14.744495,-91.159547],[14.744785,-91.159467],[14.745354,-91.158201],[14.745615,-91.158064],[14.745997,-91.157154],[14.745988,-91.156527],[14.746241,-91.156504],[14.746703,-91.155938],[14.746876,-91.155903],[14.747072,-91.155684],[14.747085,-91.155406],[14.74742,-91.154934],[14.748454,-91.155789],[14.74857,-91.155422],[14.748917,-91.154962],[14.749401,-91.154632],[14.7493,-91.154028],[14.748554,-91.153103]],[[14.748356,-91.162575],[14.747689,-91.162346],[14.746954,-91.162564],[14.744634,-91.162686],[14.744169,-91.163012],[14.744051,-91.163442],[14.744711,-91.163247],[14.74565,-91.16343],[14.745944,-91.163554],[14.746541,-91.164327],[14.74686,-91.165218],[14.747122,-91.165597],[14.74716,-91.16679],[14.74725,-91.166948],[14.747555,-91.167098],[14.74766,-91.167458],[14.747981,-91.167852],[14.748091,-91.168127],[14.7482,-91.168648],[14.748111,-91.169131],[14.748809,-91.169048],[14.751916,-91.1659],[14.752223,-91.162123],[14.751718,-91.1621],[14.750665,-91.16224],[14.750103,-91.16258],[14.749689,-91.162424],[14.749182,-91.162442],[14.748771,-91.162592],[14.748356,-91.162575]]],"Grupo 5":[[[14.738452,-91.152037],[14.737071,-91.152879],[14.736023,-91.153703],[14.733822,-91.155076],[14.732705,-91.155038],[14.733411,-91.15625],[14.733629,-91.156932],[14.73364,-91.157527],[14.733729,-91.157758],[14.734027,-91.157477],[14.734289,-91.157374],[14.734636,-91.156934],[14.735083,-91.156605],[14.735637,-91.156515],[14.736245,-91.15626],[14.737366,-91.155557],[14.73812,-91.154718],[14.738037,-91.154481],[14.740446,-91.152525],[14.739988,-91.152281],[14.739853,-91.152122],[14.739652,-91.151476],[14.738452,-91.152037]]],"Grupo 4":[[[14.751008,-91.14371],[14.750505,-91.144075],[14.749439,-91.144368],[14.749323,-91.144141],[14.748193,-91.144589],[14.746097,-91.145219],[14.745971,-91.145646],[14.74605,-91.14612],[14.746196,-91.146382],[14.74606,-91.146417],[14.745058,-91.147464],[14.744697,-91.147613],[14.743849,-91.148234],[14.743343,-91.148947],[14.742598,-91.149266],[14.742106,-91.148936],[14.741491,-91.148914],[14.741294,-91.149447],[14.741168,-91.150171],[14.741005,-91.150278],[14.740861,-91.150141],[14.740399,-91.150284],[14.740223,-91.149969],[14.739943,-91.14986],[14.73913,-91.149953],[14.73887,-91.150571],[14.739594,-91.151046],[14.73991,-91.152083],[14.740024,-91.152226],[14.740507,-91.152442],[14.740525,-91.152524],[14.741679,-91.151518],[14.742848,-91.150927],[14.743064,-91.150755],[14.743072,-91.15057],[14.743666,-91.150252],[14.743813,-91.150025],[14.743739,-91.149918],[14.743867,-91.149835],[14.743822,-91.149771],[14.743869,-91.149743],[14.743931,-91.149927],[14.744113,-91.149563],[14.744756,-91.148781],[14.745155,-91.148509],[14.745778,-91.147897],[14.746089,-91.147848],[14.746434,-91.147495],[14.746564,-91.147632],[14.746639,-91.147587],[14.746787,-91.147373],[14.746814,-91.147051],[14.747103,-91.146879],[14.747511,-91.146897],[14.747694,-91.146995],[14.74829,-91.146754],[14.748728,-91.146329],[14.748769,-91.145976],[14.748884,-91.145835],[14.74947,-91.14574],[14.749639,-91.145654],[14.749604,-91.14556],[14.749949,-91.145502],[14.750857,-91.144905],[14.75066,-91.144671],[14.750869,-91.144628],[14.750947,-91.144376],[14.751248,-91.144285],[14.75184,-91.143753],[14.752421,-91.142779],[14.752639,-91.142311],[14.75257,-91.142221],[14.752165,-91.142239],[14.751449,-91.143239],[14.751008,-91.14371]]],"Grupo 6":[[[14.739536,-91.151095],[14.737579,-91.149753],[14.737607,-91.149404],[14.7383,-91.149465],[14.738419,-91.149337],[14.738327,-91.148953],[14.737997,-91.148945],[14.737556,-91.148413],[14.736884,-91.148103],[14.736584,-91.14935],[14.736206,-91.148605],[14.734002,-91.147976],[14.733801,-91.147702],[14.733369,-91.147396],[14.732592,-91.146294],[14.732001,-91.146221],[14.731389,-91.146561],[14.73162,-91.146778],[14.732055,-91.146907],[14.732396,-91.147131],[14.732626,-91.148041],[14.732577,-91.148998],[14.732761,-91.150101],[14.732599,-91.15053],[14.732616,-91.150901],[14.73274,-91.151022],[14.73285,-91.151428],[14.732635,-91.152079],[14.732684,-91.152973],[14.732443,-91.153822],[14.732705,-91.154551],[14.732704,-91.154984],[14.73342,-91.154903],[14.733886,-91.15498],[14.735978,-91.153664],[14.737019,-91.152862],[14.73807,-91.152202],[14.739641,-91.151422],[14.739536,-91.151095]]]};
+
+  const state = {
+    records: SEED.slice(),
+    query: "",
+    selectedId: SEED[0] ? SEED[0].id : null,
+    statusFilter: "todas",
+    groupBy: "ninguno",   // ninguno | grupo | relacion
+    grupoFilter: null,    // "Grupo 1" etc, set from the map
+    activeView: "fichero",
+    showAllCards: false
+  };
+
+  let map = null;
+  let mapMarkers = {};
+  let individualLayer = null;
+
+  // ---------- helpers ----------
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+  }
+  function initials(name){
+    if(!name) return "?";
+    const parts = name.trim().split(/\s+/);
+    return ((parts[0]?.[0]||"") + (parts[1]?.[0]||"")).toUpperCase();
+  }
+  function isInformed(r){ return /s[ií]/i.test(r.informado || ""); }
+  function missingFields(r){ return WATCH_FIELDS.filter(f => !r[f.key]); }  function completeness(r){
+    const total = WATCH_FIELDS.length;
+    const have = total - missingFields(r).length;
+    return total === 0 ? 1 : have/total;
+  }
+  // acepta "grupo_1", "Grupo 1", "GRUPO1", "1", etc. y los deja todos como "Grupo 1"
+  function normalizeGrupo(v){
+    if(v == null) return "";
+    const s = String(v).trim();
+    if(!s) return "";
+    const m = s.match(/(\d+)/);
+    return m ? ("Grupo " + m[1]) : s;
+  }
+  function groupInfo(r){ return GROUP_LOCATIONS[r.numero_grupo] || null; }
+  function digitsOnly(phone){ return String(phone||"").replace(/[^\d]/g, ""); }
+  function waLink(phone){
+    let d = digitsOnly(phone);
+    if(!d) return null;
+    if(d.length <= 8) d = "502" + d;
+    return `https://wa.me/${d}`;
+  }
+  function telLink(phone){
+    let d = digitsOnly(phone);
+    if(!d) return null;
+    if(d.length <= 8) d = "502" + d;
+    return `tel:+${d}`;
+  }
+  function mailLink(email, name){
+    if(!email) return null;
+    const subject = encodeURIComponent("Contacto de emergencia");
+    const body = encodeURIComponent(name ? `Hola ${name},\n\n` : "Hola,\n\n");
+    return `mailto:${email}?subject=${subject}&body=${body}`;
+  }
+  function ringSvg(size, stroke, pct, color, trackColor){
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const offset = c * (1 - pct);
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${trackColor}" stroke-width="${stroke}"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+        stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
+    </svg>`;
+  }
+  function formatDate(iso){
+    try{
+      const d = new Date(iso);
+      return d.toLocaleDateString("es-GT", { day:"2-digit", month:"short", year:"numeric" });
+    }catch(e){ return ""; }
+  }
+
+  // ---------- data loading ----------
+  // Transforma filas crudas (objetos header->valor, ya sea desde el .xlsx
+  // subido o desde el JSON del Google Sheet en vivo) al formato interno.
+  function mapRawRows(rows){
+    return rows
+      .filter(r => r[COLS.nombre_publicador])
+      .map((r,i) => ({
+        id: r["_id"] || ("row-"+i),
+        nombre_publicador: r[COLS.nombre_publicador] || "",
+        numero_grupo: normalizeGrupo(r[COLS.numero_grupo] || ""),
+        telefono_publicador: r[COLS.telefono_publicador] || "",
+        correo_publicador: r[COLS.correo_publicador] || "",
+        nombre_contacto: r[COLS.nombre_contacto] || "",
+        relacion: r[COLS.relacion] || "",
+        telefono_contacto: r[COLS.telefono_contacto] || "",
+        telefono_alt: r[COLS.telefono_alt] || "",
+        correo_contacto: r[COLS.correo_contacto] || "",
+        informado: r[COLS.informado] || "",
+        fecha: r["_submission_time"] || ""
+      }));
+  }
+
+  // ---------- live Google Sheet connection (JSONP vía gviz, sin token ni CORS) ----------
+  // No requiere Apps Script Web App: solo que la hoja esté compartida como
+  // "Cualquiera con el enlace: Lector". Se inyecta un <script> que apunta al
+  // endpoint gviz de Google Sheets, que responde ejecutando una función JS
+  // en vez de JSON puro — así se evita el bloqueo de CORS del navegador.
+  const SHEET_URL_KEY = "tarjetas_sheet_url";
+  const SHEET_TAB_KEY = "tarjetas_sheet_tab";
+  const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1L60gkALHWWCISmSIFLk9oZqS6ox2tb22XXLehAPr8Wg/edit?usp=sharing";
+  const DEFAULT_SHEET_TAB = "kobo_data";
+  let sheetAutoTimer = null;
+
+  function getSavedSheetUrl(){ try{ return localStorage.getItem(SHEET_URL_KEY) || ""; }catch(e){ return ""; } }
+  function getSavedSheetTab(){ try{ return localStorage.getItem(SHEET_TAB_KEY) || DEFAULT_SHEET_TAB; }catch(e){ return DEFAULT_SHEET_TAB; } }
+  function saveSheetConn(url, tab){
+    try{ localStorage.setItem(SHEET_URL_KEY, url); localStorage.setItem(SHEET_TAB_KEY, tab); }catch(e){}
+  }
+  function clearSavedSheetConn(){
+    try{ localStorage.removeItem(SHEET_URL_KEY); localStorage.removeItem(SHEET_TAB_KEY); }catch(e){}
+  }
+
+  function gsParseUrl(url){
+    url = (url||"").trim();
+    const o = { id:"", gid:"" };
+    if(!url) return o;
+    const m = url.match(/\/d\/(?:e\/)?([a-zA-Z0-9\-_]+)/);
+    if(m) o.id = m[1];
+    const gm = url.match(/[#&?]gid=([0-9]+)/);
+    if(gm) o.gid = gm[1];
+    return o;
+  }
+
+  function rowToObj(headers, arr){
+    const o = {};
+    headers.forEach((h,i) => { o[h] = (arr[i] === undefined || arr[i] === null) ? "" : arr[i]; });
+    return o;
+  }
+
+  // Pide la hoja vía JSONP y resuelve con un array de filas { header: valor }
+  function fetchSheetRowsJSONP(sheetUrl, tabName){
+    return new Promise((resolve, reject) => {
+      const parsed = gsParseUrl(sheetUrl);
+      if(!parsed.id){ reject(new Error("Enlace de Google Sheets no válido.")); return; }
+
+      const cbName = "tarjetasGvizCB_" + Date.now();
+      let script = null, done = false;
+      const cleanup = () => {
+        try{ delete window[cbName]; }catch(e){ window[cbName] = undefined; }
+        if(script && script.parentNode) script.parentNode.removeChild(script);
+      };
+      const timer = setTimeout(() => {
+        if(done) return; done = true;
+        cleanup();
+        reject(new Error("Sin respuesta de Google Sheets (20s). Verifica el enlace y que la hoja esté compartida como \"Cualquiera con el enlace: Lector\"."));
+      }, 20000);
+
+      window[cbName] = function(resp){
+        if(done) return; done = true; clearTimeout(timer);
+        try{
+          if(resp && resp.status === "error"){
+            throw new Error((resp.errors && resp.errors[0] && resp.errors[0].detailed_message) || "error de la hoja");
+          }
+          if(!resp || !resp.table) throw new Error("respuesta vacía");
+          const cols = resp.table.cols || [], rows = resp.table.rows || [];
+          const headers = cols.map(c => (c.label || c.id || "").toString());
+          const dataRows = rows.map(r => {
+            const cells = r.c || [];
+            return headers.map((_, k) => {
+              const cell = cells[k];
+              if(cell == null) return "";
+              return cell.v != null ? cell.v : (cell.f != null ? cell.f : "");
+            });
+          });
+          resolve(dataRows.map(arr => rowToObj(headers, arr)));
+        }catch(err){ reject(err); }
+        cleanup();
+      };
+
+      let gvizUrl = `https://docs.google.com/spreadsheets/d/${parsed.id}/gviz/tq?`;
+      const tab = (tabName || "").trim();
+      if(tab) gvizUrl += `sheet=${encodeURIComponent(tab)}&`;
+      else if(parsed.gid) gvizUrl += `gid=${encodeURIComponent(parsed.gid)}&`;
+      gvizUrl += `headers=1&tqx=responseHandler:${cbName}&t=${Date.now()}`;
+
+      script = document.createElement("script");
+      script.src = gvizUrl;
+      script.onerror = function(){
+        if(done) return; done = true; clearTimeout(timer);
+        cleanup();
+        reject(new Error("No se pudo contactar Google Sheets (enlace incorrecto o sin permiso de lectura)."));
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  // Diagnóstico: muestra los encabezados reales que llegan del Sheet, para
+  // poder comparar contra HEADER_MAP sin necesidad de abrir la hoja.
+  async function debugShowHeaders(){
+    const url = document.getElementById("sheet-url-input").value.trim() || DEFAULT_SHEET_URL;
+    const tab = document.getElementById("sheet-tab-input").value.trim() || DEFAULT_SHEET_TAB;
+    const notice = document.getElementById("sync-notice");
+    notice.className = "show";
+    notice.textContent = "Leyendo columnas del Sheet…";
+    try{
+      const rows = await fetchSheetRowsJSONP(url, tab);
+      const headers = rows.length ? Object.keys(rows[0]) : [];
+      if(headers.length === 0){
+        notice.className = "show err";
+        notice.textContent = "El Sheet no devolvió columnas (¿está vacío o el nombre de la pestaña es incorrecto?).";
+        return;
+      }
+      notice.className = "show ok";
+      notice.innerHTML = "<b>Columnas encontradas en el Sheet:</b><br>" + headers.map(h => "· " + esc(h)).join("<br>");
+    }catch(err){
+      notice.className = "show err";
+      notice.textContent = err.message || "No se pudo leer el Sheet.";
+    }
+  }
+
+  function updateSyncButton(kind, stamp){
+    const btn = document.getElementById("sync-toggle-btn");
+    const icon = document.getElementById("sync-btn-icon");
+    const dot = document.getElementById("sync-btn-dot");
+    const label = document.getElementById("sync-btn-label");
+    btn.classList.remove("connected", "err");
+    if(kind === "connected"){
+      btn.classList.add("connected");
+      icon.style.display = "none";
+      dot.style.display = "inline-block";
+      label.textContent = "Conectado";
+      btn.title = stamp ? `Última actualización: ${stamp}` : "Conectado";
+    } else if(kind === "err"){
+      btn.classList.add("err");
+      icon.style.display = "inline-block";
+      dot.style.display = "none";
+      label.textContent = "Reconectar";
+      btn.title = "No se pudo conectar — clic para reintentar";
+    } else {
+      icon.style.display = "inline-block";
+      dot.style.display = "none";
+      label.textContent = "Google Sheet en vivo";
+      btn.title = "";
+    }
+  }
+
+  // ---------- caché sin conexión ----------
+  // Guarda la última copia de los datos que sí se pudo cargar, para poder
+  // mostrarla si el celular se abre sin internet.
+  const OFFLINE_CACHE_KEY = "tarjetas_offline_cache";
+  function saveOfflineCache(records){
+    try{
+      localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify({
+        records,
+        stamp: new Date().toLocaleString("es-GT", { dateStyle:"short", timeStyle:"short" })
+      }));
+    }catch(e){}
+  }
+  function loadOfflineCache(){
+    try{
+      const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+
+  async function syncFromSheet(url, tab, { silent } = {}){
+    const notice = document.getElementById("sync-notice");
+    if(!silent){
+      notice.className = "show";
+      notice.textContent = "Conectando con Google Sheets…";
+    }
+    try{
+      const rawRows = await fetchSheetRowsJSONP(url, tab);
+      const mapped = mapRawRows(rawRows);
+      if(mapped.length === 0){
+        notice.className = "show err";
+        notice.textContent = "El Sheet respondió, pero no se encontraron filas con datos de publicador. Revisa el nombre de la pestaña y los encabezados.";
+        updateSyncButton("err");
+        return false;
+      }
+      state.records = mapped;
+      state.selectedId = mapped[0].id;
+      saveOfflineCache(mapped);
+      render();
+      const stamp = new Date().toLocaleTimeString("es-GT", { hour:"2-digit", minute:"2-digit" });
+      notice.className = "show ok";
+      notice.textContent = `Conectado · ${mapped.length} tarjeta${mapped.length===1?"":"s"} · actualizado ${stamp}`;
+      updateSyncPanel(true);
+      updateSyncButton("connected", stamp);
+      return true;
+    }catch(err){
+      const cached = loadOfflineCache();
+      if(cached && Array.isArray(cached.records) && cached.records.length > 0){
+        state.records = cached.records;
+        state.selectedId = cached.records[0].id;
+        render();
+        notice.className = "show err";
+        notice.textContent = `Sin conexión — mostrando los datos guardados del ${cached.stamp}.`;
+        updateSyncPanel(false);
+        updateSyncButton("err");
+        return true;
+      }
+      notice.className = "show err";
+      notice.textContent = err.message || "No se pudo conectar con Google Sheets.";
+      updateSyncPanel(false);
+      updateSyncButton("err");
+      return false;
+    }
+  }
+
+  function startAutoRefresh(url, tab){
+    if(sheetAutoTimer) clearInterval(sheetAutoTimer);
+    sheetAutoTimer = setInterval(() => syncFromSheet(url, tab, { silent:true }), 5 * 60 * 1000);
+  }
+  function stopAutoRefresh(){
+    if(sheetAutoTimer) clearInterval(sheetAutoTimer);
+    sheetAutoTimer = null;
+  }
+
+  function updateSyncPanel(connected){
+    const urlInput = document.getElementById("sheet-url-input");
+    const tabInput = document.getElementById("sheet-tab-input");
+    const connectBtn = document.getElementById("sheet-connect-btn");
+    const refreshBtn = document.getElementById("sheet-refresh-btn");
+    const disconnectBtn = document.getElementById("sheet-disconnect-btn");
+    refreshBtn.style.display = connected ? "inline-flex" : "none";
+    disconnectBtn.style.display = connected ? "inline-flex" : "none";
+    connectBtn.textContent = connected ? "Reconectar" : "Conectar";
+    if(connected){
+      urlInput.value = getSavedSheetUrl();
+      tabInput.value = getSavedSheetTab();
+    }
+  }
+
+  function openSyncPanel(){
+    const panel = document.getElementById("sync-panel");
+    panel.classList.add("show");
+    const saved = getSavedSheetUrl();
+    document.getElementById("sheet-url-input").value = saved || DEFAULT_SHEET_URL;
+    document.getElementById("sheet-tab-input").value = saved ? getSavedSheetTab() : DEFAULT_SHEET_TAB;
+    updateSyncPanel(!!saved);
+  }
+
+  document.getElementById("sync-settings-btn").addEventListener("click", () => {
+    const panel = document.getElementById("sync-panel");
+    if(panel.classList.contains("show")) panel.classList.remove("show");
+    else openSyncPanel();
+  });
+
+  // El botón principal ("Google Sheet en vivo" / "Conectado") NO abre el
+  // panel: si ya hay una conexión, solo refresca los datos. Si todavía no
+  // hay ninguna, abre el panel para que el usuario la configure la primera vez.
+  document.getElementById("sync-toggle-btn").addEventListener("click", () => {
+    const saved = getSavedSheetUrl();
+    const url = saved || DEFAULT_SHEET_URL;
+    if(url){
+      const tab = saved ? getSavedSheetTab() : DEFAULT_SHEET_TAB;
+      syncFromSheet(url, tab).then(ok => { if(ok){ saveSheetConn(url, tab); startAutoRefresh(url, tab); } });
+    } else {
+      openSyncPanel();
+    }
+  });
+
+  document.getElementById("sheet-connect-btn").addEventListener("click", async () => {
+    const url = document.getElementById("sheet-url-input").value.trim();
+    const tab = document.getElementById("sheet-tab-input").value.trim() || "kobo_data";
+    if(!url) return;
+    const ok = await syncFromSheet(url, tab);
+    if(ok){
+      saveSheetConn(url, tab);
+      startAutoRefresh(url, tab);
+    }
+  });
+
+  document.getElementById("sheet-refresh-btn").addEventListener("click", () => {
+    const url = getSavedSheetUrl();
+    if(url) syncFromSheet(url, getSavedSheetTab());
+  });
+
+  document.getElementById("sheet-disconnect-btn").addEventListener("click", () => {
+    clearSavedSheetConn();
+    stopAutoRefresh();
+    document.getElementById("sheet-url-input").value = "";
+    document.getElementById("sheet-tab-input").value = "kobo_data";
+    const notice = document.getElementById("sync-notice");
+    notice.className = "show";
+    notice.textContent = "Desconectado. Los datos que ya se cargaron siguen visibles hasta que subas otro archivo o vuelvas a conectar.";
+    updateSyncPanel(false);
+    updateSyncButton("idle");
+  });
+
+  document.getElementById("sheet-debug-btn").addEventListener("click", debugShowHeaders);
+
+  // conecta automáticamente al abrir: usa lo que haya guardado en este
+  // navegador, o si no hay nada guardado (primera vez), el enlace por
+  // defecto del formulario.
+  (function initSheetConnection(){
+    const saved = getSavedSheetUrl();
+    const url = saved || DEFAULT_SHEET_URL;
+    const tab = saved ? getSavedSheetTab() : DEFAULT_SHEET_TAB;
+    syncFromSheet(url, tab, { silent:true }).then(ok => { if(ok) startAutoRefresh(url, tab); });
+  })();
+
+  // ---------- filtering ----------
+  function getFiltered(){
+    const q = state.query.trim().toLowerCase();
+    let list = state.records;
+    if(q){
+      list = list.filter(r => [r.nombre_publicador, r.nombre_contacto, r.telefono_publicador, r.telefono_contacto, r.numero_grupo]
+        .join(" ").toLowerCase().includes(q));
+    }
+    if(state.statusFilter !== "todas"){
+      list = list.filter(r => state.statusFilter === "informado" ? isInformed(r) : !isInformed(r));
+    }
+    if(state.grupoFilter){
+      list = list.filter(r => r.numero_grupo === state.grupoFilter);
+    }
+    return list.slice().sort((a,b) => a.nombre_publicador.localeCompare(b.nombre_publicador, "es"));
+  }
+
+  // ---------- export to Excel (sorted, styled, 2 sheets) ----------
+  const XLSX_STYLE = {
+    header: {
+      font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "FFFFFFFF" } },
+      fill: { patternType: "solid", fgColor: { rgb: "FF0E7C6B" } },
+      alignment: { vertical: "center", horizontal: "left", wrapText: false },
+      border: {
+        top: { style: "thin", color: { rgb: "FF0A5B4E" } },
+        bottom: { style: "thin", color: { rgb: "FF0A5B4E" } },
+        left: { style: "thin", color: { rgb: "FF0A5B4E" } },
+        right: { style: "thin", color: { rgb: "FF0A5B4E" } }
+      }
+    },
+    cellBase: {
+      font: { name: "Calibri", sz: 10.5, color: { rgb: "FF0F1720" } },
+      alignment: { vertical: "center", horizontal: "left" },
+      border: {
+        top: { style: "thin", color: { rgb: "FFE1E7EA" } },
+        bottom: { style: "thin", color: { rgb: "FFE1E7EA" } },
+        left: { style: "thin", color: { rgb: "FFE1E7EA" } },
+        right: { style: "thin", color: { rgb: "FFE1E7EA" } }
+      }
+    },
+    cellAlt: { fill: { patternType: "solid", fgColor: { rgb: "FFF7F9FA" } } },
+    badgeOk: {
+      font: { name: "Calibri", sz: 10.5, bold: true, color: { rgb: "FF0A5B4E" } },
+      fill: { patternType: "solid", fgColor: { rgb: "FFE4F3F0" } },
+      alignment: { vertical: "center", horizontal: "center" }
+    },
+    badgePending: {
+      font: { name: "Calibri", sz: 10.5, bold: true, color: { rgb: "FF9A3B27" } },
+      fill: { patternType: "solid", fgColor: { rgb: "FFFCEAE5" } },
+      alignment: { vertical: "center", horizontal: "center" }
+    }
+  };
+
+  function styleSheet(ws, headers, opts = {}){
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+    for(let C = range.s.c; C <= range.e.c; C++){
+      const headerRef = XLSX.utils.encode_cell({ r: 0, c: C });
+      if(ws[headerRef]) ws[headerRef].s = XLSX_STYLE.header;
+      for(let R = 1; R <= range.e.r; R++){
+        const ref = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = ws[ref];
+        if(!cell) continue;
+        const base = JSON.parse(JSON.stringify(XLSX_STYLE.cellBase));
+        if(R % 2 === 0) Object.assign(base, JSON.parse(JSON.stringify(XLSX_STYLE.cellAlt)));
+        const headerName = headers[C];
+        if(opts.badgeCol && headerName === opts.badgeCol){
+          cell.s = cell.v === "Informado" ? XLSX_STYLE.badgeOk : XLSX_STYLE.badgePending;
+        } else {
+          cell.s = base;
+        }
+      }
+    }
+    ws["!rows"] = ws["!rows"] || [];
+    ws["!rows"][0] = { hpt: 22 };
+    ws["!autofilter"] = { ref: ws["!ref"] };
+  }
+
+  function exportToExcel(){
+    // Este botón siempre exporta TODOS los publicadores (grupos 1-6), sin
+    // importar si hay un grupo seleccionado o algún filtro activo en pantalla.
+    const rows = state.records;
+
+    // Hoja 1: datos limpios del publicador (sin Estado / Datos incompletos / Fecha de envío)
+    const mainHeaders = [
+      "#","Nombre del publicador","Número de grupo","Teléfono del publicador","Correo del publicador",
+      "Nombre del contacto de emergencia","Relación con el publicador","Teléfono del contacto",
+      "Teléfono alternativo","Correo del contacto"
+    ];
+    const mainData = rows.map((r, i) => {
+      return {
+        "#": i + 1,
+        "Nombre del publicador": r.nombre_publicador,
+        "Número de grupo": r.numero_grupo,
+        "Teléfono del publicador": r.telefono_publicador,
+        "Correo del publicador": r.correo_publicador,
+        "Nombre del contacto de emergencia": r.nombre_contacto,
+        "Relación con el publicador": r.relacion,
+        "Teléfono del contacto": r.telefono_contacto,
+        "Teléfono alternativo": r.telefono_alt,
+        "Correo del contacto": r.correo_contacto
+      };
+    });
+
+    // Hoja 2: "Datos" — tabla completa igual a la vista en pantalla (incluye estado y seguimiento)
+    const fullHeaders = [
+      ...mainHeaders, "Estado", "Datos incompletos", "Fecha de envío"
+    ];
+    const fullData = rows.map((r, i) => {
+      return {
+        "#": i + 1,
+        "Nombre del publicador": r.nombre_publicador,
+        "Número de grupo": r.numero_grupo,
+        "Teléfono del publicador": r.telefono_publicador,
+        "Correo del publicador": r.correo_publicador,
+        "Nombre del contacto de emergencia": r.nombre_contacto,
+        "Relación con el publicador": r.relacion,
+        "Teléfono del contacto": r.telefono_contacto,
+        "Teléfono alternativo": r.telefono_alt,
+        "Correo del contacto": r.correo_contacto,
+        "Estado": isInformed(r) ? "Informado" : "Pendiente",
+        "Datos incompletos": missingFields(r).map(f => f.label).join(", ") || "Ninguno",
+        "Fecha de envío": r.fecha ? formatDate(r.fecha) : ""
+      };
+    });
+
+    const mainCols = [
+      { wch:4 }, { wch:28 }, { wch:12 }, { wch:16 }, { wch:26 },
+      { wch:28 }, { wch:20 }, { wch:20 }, { wch:18 }, { wch:26 }
+    ];
+
+    const ws1 = XLSX.utils.json_to_sheet(mainData);
+    ws1["!cols"] = mainCols;
+    styleSheet(ws1, mainHeaders);
+
+    const ws2 = XLSX.utils.json_to_sheet(fullData);
+    ws2["!cols"] = [...mainCols, { wch:12 }, { wch:34 }, { wch:14 }];
+    styleSheet(ws2, fullHeaders, { badgeCol: "Estado" });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, "Tarjetas de emergencia");
+    XLSX.utils.book_append_sheet(wb, ws2, "Datos");
+
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `tarjetas_emergencia_ordenadas_${stamp}.xlsx`);
+  }
+  document.getElementById("download-btn").addEventListener("click", exportToExcel);
+
+  // ---------- export to Excel, agrupado por número de grupo (1 → 6) ----------
+  function groupSortKey(r){
+    const m = String(r.numero_grupo || "").match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : 999;
+  }
+  function exportToExcelByGroup(){
+    // Igual que el Excel ordenado: siempre exporta TODOS los publicadores,
+    // sin importar ningún filtro o grupo seleccionado en pantalla.
+    const rows = state.records.slice().sort((a, b) => {
+      const ga = groupSortKey(a), gb = groupSortKey(b);
+      if(ga !== gb) return ga - gb;
+      return (a.nombre_publicador || "").localeCompare(b.nombre_publicador || "", "es");
+    });
+
+    const headers = [
+      "#","Nombre del publicador","Número de grupo","Teléfono del publicador","Correo del publicador",
+      "Nombre del contacto de emergencia","Relación con el publicador","Teléfono del contacto",
+      "Teléfono alternativo","Correo del contacto"
+    ];
+    const toRow = (r, i) => ({
+      "#": i + 1,
+      "Nombre del publicador": r.nombre_publicador,
+      "Número de grupo": r.numero_grupo,
+      "Teléfono del publicador": r.telefono_publicador,
+      "Correo del publicador": r.correo_publicador,
+      "Nombre del contacto de emergencia": r.nombre_contacto,
+      "Relación con el publicador": r.relacion,
+      "Teléfono del contacto": r.telefono_contacto,
+      "Teléfono alternativo": r.telefono_alt,
+      "Correo del contacto": r.correo_contacto
+    });
+    const cols = [
+      { wch:4 }, { wch:28 }, { wch:12 }, { wch:16 }, { wch:26 },
+      { wch:28 }, { wch:20 }, { wch:20 }, { wch:18 }, { wch:26 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+
+    // Hoja con todos, ordenados del Grupo 1 al 6
+    const wsAll = XLSX.utils.json_to_sheet(rows.map(toRow));
+    wsAll["!cols"] = cols;
+    styleSheet(wsAll, headers);
+    XLSX.utils.book_append_sheet(wb, wsAll, "Todos (Grupo 1-6)");
+
+    // Una hoja por cada grupo que tenga publicadores
+    GROUP_ORDER.forEach(key => {
+      const groupRows = rows.filter(r => r.numero_grupo === key);
+      if(groupRows.length === 0) return;
+      const ws = XLSX.utils.json_to_sheet(groupRows.map(toRow));
+      ws["!cols"] = cols;
+      styleSheet(ws, headers);
+      XLSX.utils.book_append_sheet(wb, ws, key);
+    });
+
+    // publicadores sin grupo reconocido, si los hay
+    const sinGrupo = rows.filter(r => !GROUP_LOCATIONS[r.numero_grupo]);
+    if(sinGrupo.length > 0){
+      const ws = XLSX.utils.json_to_sheet(sinGrupo.map(toRow));
+      ws["!cols"] = cols;
+      styleSheet(ws, headers);
+      XLSX.utils.book_append_sheet(wb, ws, "Sin grupo");
+    }
+
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `tarjetas_por_grupo_${stamp}.xlsx`);
+  }
+  document.getElementById("download-groups-btn").addEventListener("click", exportToExcelByGroup);
+
+  // ---------- render: shared ----------
+  function render(){
+    renderStats();
+    renderList();
+    renderCard();
+    renderMap();
+    renderLegend();
+    renderDataTable();
+    renderGrupoChips();
+  }
+
+  function renderStats(){
+    const total = state.records.length;
+    const informed = state.records.filter(isInformed).length;
+    const incomplete = state.records.filter(r => missingFields(r).length > 0).length;
+    const filtered = getFiltered().length;
+    document.getElementById("stats").innerHTML = `
+      <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Tarjetas registradas</div></div>
+      <div class="stat-card"><div class="stat-value">${informed} / ${total}</div><div class="stat-label">Contacto ya informado</div></div>
+      <div class="stat-card"><div class="stat-value ${incomplete>0?'warn':''}">${incomplete}</div><div class="stat-label">Datos incompletos</div></div>
+      <div class="stat-card"><div class="stat-value">${filtered}</div><div class="stat-label">Mostrando</div></div>
+    `;
+  }
+
+  // ---------- render: fichero ----------
+  function tabItemHtml(r){
+    const active = r.id === state.selectedId;
+    const pct = completeness(r);
+    const ringColor = isInformed(r) ? "#0E7C6B" : "#E15B41";
+    const missing = missingFields(r).length;
+    return `
+      <button class="tab-item ${active?'active':''}" data-id="${esc(r.id)}">
+        <span class="ring">
+          ${ringSvg(34, 3, pct, active ? "#ffffff" : ringColor, active ? "rgba(255,255,255,0.22)" : "#E1E7EA")}
+          <span class="ring-avatar">${esc(initials(r.nombre_publicador))}</span>
+        </span>
+        <span class="tab-text">
+          <span class="tab-name">${esc(r.nombre_publicador)}</span>
+          <span class="tab-sub">${esc(r.numero_grupo || "Sin grupo")} · ${esc(r.telefono_publicador || "sin teléfono")}</span>
+        </span>
+        ${missing>0 ? `<span class="tab-warn" title="${missing} dato(s) opcional(es) sin completar">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </span>` : ""}
+      </button>
+    `;
+  }
+
+  function renderGrupoChips(){
+    const el = document.getElementById("grupo-chip-row");
+    el.innerHTML = GROUP_ORDER.map(key => {
+      const gi = GROUP_LOCATIONS[key];
+      const active = state.grupoFilter === key;
+      const n = key.replace("Grupo ", "");
+      return `<button class="grupo-chip ${active?'active':''}" data-grupo="${esc(key)}" title="${esc(key)} · ${esc(gi.place)}">
+        <span class="dot" style="background:${gi.color}"></span>
+        <span class="label">G${esc(n)}</span>
+      </button>`;
+    }).join("");
+    el.querySelectorAll(".grupo-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-grupo");
+        state.grupoFilter = state.grupoFilter === key ? null : key;
+        renderStats();
+        renderList();
+        renderGrupoChips();
+        renderDataTable();
+      });
+    });
+  }
+
+  function renderList(){
+    const listEl = document.getElementById("tab-list");
+    const filtered = getFiltered();
+
+    const pill = document.getElementById("grupo-filter-pill");
+    if(state.grupoFilter){
+      const gi = GROUP_LOCATIONS[state.grupoFilter];
+      document.getElementById("grupo-filter-label").textContent =
+        `Filtrando: ${state.grupoFilter}${gi ? " · " + gi.place : ""}`;
+      pill.classList.add("show");
+    }else{
+      pill.classList.remove("show");
+    }
+
+    if(filtered.length === 0){
+      listEl.innerHTML = `<div class="empty-list">No se encontró ningún publicador con esos criterios.</div>`;
+      return;
+    }
+
+    if(state.groupBy === "ninguno"){
+      listEl.innerHTML = filtered.map(tabItemHtml).join("");
+    }else{
+      const keyFn = state.groupBy === "grupo"
+        ? (r => r.numero_grupo || "Sin especificar")
+        : (r => r.relacion || "Sin especificar");
+      const map_ = new Map();
+      filtered.forEach(r => {
+        const key = keyFn(r);
+        if(!map_.has(key)) map_.set(key, []);
+        map_.get(key).push(r);
+      });
+      const groups = [...map_.entries()].sort((a,b) => a[0].localeCompare(b[0], "es"));
+      listEl.innerHTML = groups.map(([label, items]) => `
+        <div class="group-header"><span>${esc(label)}</span><span>${items.length}</span></div>
+        ${items.map(tabItemHtml).join("")}
+      `).join("");
+    }
+
+    listEl.querySelectorAll(".tab-item").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        const match = state.records.find(r => String(r.id) === id);
+        if(match){ state.selectedId = match.id; state.showAllCards = false; renderList(); renderCard(); }
+      });
+    });
+  }
+
+  function cardHtml(r){
+    const informed = isInformed(r);
+    const missing = missingFields(r);
+    const pct = completeness(r);
+    const ringColor = informed ? "rgba(255,255,255,0.95)" : "#FFD9CC";
+    const gi = groupInfo(r);
+
+    return `
+      <div class="card">
+        <div class="card-header">
+          <div class="card-toprow">
+            <div class="card-eyebrow">
+              <span>Publicador</span>
+              ${r.numero_grupo ? `<span class="grupo-badge"><span class="dot" style="background:${gi ? gi.color : '#fff'}"></span>${esc(r.numero_grupo)}${gi ? " · " + esc(gi.place) : ""}</span>` : ""}
+            </div>
+            <div class="status-pill ${informed ? "" : "pending"}">
+              ${informed ? iconShieldCheck() : iconShieldAlert()}
+              <span>${informed ? "Informado" : "Pendiente"}</span>
+            </div>
+          </div>
+          <div class="publicador-row">
+            <span class="big-ring">
+              ${ringSvg(64, 4, pct, ringColor, "rgba(255,255,255,0.22)")}
+              <span class="big-ring-avatar">${esc(initials(r.nombre_publicador))}</span>
+            </span>
+            <div>
+              <div class="card-name">${esc(r.nombre_publicador)}</div>
+            </div>
+          </div>
+          <div class="field-grid on-dark">
+            <div>
+              <div class="field-label">Teléfono</div>
+              <div class="field-value">${r.telefono_publicador ? esc(r.telefono_publicador) : "—"}${phoneActions(r.telefono_publicador)}</div>
+            </div>
+            <div>
+              <div class="field-label">Correo electrónico</div>
+              <div class="field-value">${r.correo_publicador ? esc(r.correo_publicador) : "—"}${mailActions(r.correo_publicador, r.nombre_publicador.split(" ")[0])}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="relation-strip">
+          <span>${iconUsers()} Contacto de emergencia: <b>${esc(r.nombre_contacto) || "sin nombre"}</b></span>
+          <span class="link-tag">${esc(r.relacion || "relación no indicada")}</span>
+        </div>
+
+        <div class="card-body">
+          <span class="section-label">${iconAlertShield()} Datos del contacto</span>
+          <div class="field-grid">
+            <div>
+              <div class="field-label">Nombre</div>
+              <div class="field-value">${esc(r.nombre_contacto) || "—"}</div>
+            </div>
+            <div>
+              <div class="field-label">Relación con el publicador</div>
+              <div class="field-value">${esc(r.relacion) || "—"}</div>
+            </div>
+            <div>
+              <div class="field-label">Teléfono</div>
+              <div class="field-value mono">${r.telefono_contacto ? esc(r.telefono_contacto) : "—"}${phoneActions(r.telefono_contacto)}</div>
+            </div>
+            <div>
+              <div class="field-label">Teléfono alternativo</div>
+              <div class="field-value mono">${r.telefono_alt ? esc(r.telefono_alt) : "—"}${phoneActions(r.telefono_alt)}</div>
+            </div>
+            <div>
+              <div class="field-label">Correo electrónico</div>
+              <div class="field-value">${r.correo_contacto ? esc(r.correo_contacto) : "—"}${mailActions(r.correo_contacto, r.nombre_contacto.split(" ")[0])}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <span>Ficha ${typeof r.id === "number" ? ("N.º " + r.id) : esc(r.id)}</span>
+          <span>${r.fecha ? esc(formatDate(r.fecha)) : ""}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function compactCardHtml(r){
+    const informed = isInformed(r);
+    const gi = groupInfo(r);
+    const color = gi ? gi.color : "#0E7C6B";
+    return `
+      <div class="pcard" style="--pcard-color:${color}; --pcard-tint:${color}22;">
+        <div class="pcard-head">
+          <div class="pcard-name">${esc(r.nombre_publicador)}</div>
+          <div class="pcard-badges">
+            ${r.numero_grupo ? `<span class="pcard-badge">${esc(r.numero_grupo)}</span>` : ""}
+            <span class="pcard-status ${informed ? "" : "pending"}">${informed ? "Informado" : "Pendiente"}</span>
+          </div>
+        </div>
+        <div class="pcard-row"><b>Tel:</b>${r.telefono_publicador ? esc(r.telefono_publicador) : "—"}</div>
+        <div class="pcard-row"><b>Correo:</b>${r.correo_publicador ? esc(r.correo_publicador) : "—"}</div>
+        <div class="pcard-section-title">Contacto de emergencia</div>
+        <div class="pcard-row"><b>Nombre:</b>${r.nombre_contacto ? esc(r.nombre_contacto) : "—"}${r.relacion ? " (" + esc(r.relacion) + ")" : ""}</div>
+        <div class="pcard-row"><b>Tel:</b>${r.telefono_contacto ? esc(r.telefono_contacto) : "—"}</div>
+        <div class="pcard-row"><b>Tel. alt:</b>${r.telefono_alt ? esc(r.telefono_alt) : "—"}</div>
+        <div class="pcard-row"><b>Correo:</b>${r.correo_contacto ? esc(r.correo_contacto) : "—"}</div>
+      </div>
+    `;
+  }
+
+  function renderCard(){
+    const filtered = getFiltered();
+    const selected = state.records.find(r => r.id === state.selectedId) || filtered[0] || null;
+    const printBtn = document.getElementById("print-btn");
+    const printAllBtn = document.getElementById("print-all-btn");
+    const toggleAllBtn = document.getElementById("toggle-all-btn");
+    const toggleAllLabel = document.getElementById("toggle-all-label");
+    printAllBtn.style.display = filtered.length > 0 ? "inline-flex" : "none";
+    toggleAllBtn.style.display = filtered.length > 0 ? "inline-flex" : "none";
+    toggleAllLabel.textContent = state.showAllCards ? "Ver tarjeta individual" : "Ver todas las tarjetas";
+
+    if(state.showAllCards){
+      printBtn.style.display = "none";
+      if(filtered.length > 0){
+        document.getElementById("print-card").innerHTML =
+          `<div class="cards-grid">${filtered.map(cardHtml).join("")}</div>`;
+      }else{
+        document.getElementById("print-card").innerHTML = `
+          <div class="empty-card">
+            ${iconUsers(28)}
+            <div class="empty-list">No hay tarjetas para mostrar con estos filtros.</div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    if(selected){
+      document.getElementById("print-card").innerHTML = cardHtml(selected);
+      printBtn.style.display = "inline-flex";
+    }else{
+      document.getElementById("print-card").innerHTML = `
+        <div class="empty-card">
+          ${iconUsers(28)}
+          <div class="empty-list">Selecciona una tarjeta de la lista para verla aquí.</div>
+        </div>
+      `;
+      printBtn.style.display = "none";
+    }
+  }
+
+  // action buttons
+  function phoneActions(phone){
+    if(!phone) return "";
+    const tel = telLink(phone);
+    const wa = waLink(phone);
+    return `<span class="action-btns no-print">
+      <a class="action-btn tel" href="${tel}" title="Llamar">${iconPhoneSmall(12)}</a>
+      <a class="action-btn wa" href="${wa}" target="_blank" rel="noopener" title="Escribir por WhatsApp">${iconWhatsApp(12)}<span>WhatsApp</span></a>
+    </span>`;
+  }
+  function mailActions(email, name){
+    if(!email) return "";
+    const link = mailLink(email, name);
+    return `<span class="action-btns no-print">
+      <a class="action-btn mail" href="${link}" title="Escribir correo">${iconMailSmall(12)}<span>Escribir</span></a>
+    </span>`;
+  }
+
+  // ---------- render: map ----------
+  function ensureMap(){
+    if(map) return;
+    map = L.map('map', { scrollWheelZoom: true }).setView([14.7415, -91.1535], 14);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+    }).addTo(map);
+    // light label layer on top of satellite imagery for street/place names
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      opacity: 0.9
+    }).addTo(map);
+
+    // draw the zone boundary lines for each group (from GRUPOS.json)
+    // each group can have more than one polygon part (e.g. Grupo 2 has two pieces)
+    GROUP_ORDER.forEach(key => {
+      const gi = GROUP_LOCATIONS[key];
+      const parts = GROUP_BOUNDARIES[key];
+      if(!parts) return;
+      parts.forEach(part => {
+        L.polygon(part, {
+          color: gi.color,
+          weight: 2.5,
+          opacity: 0.9,
+          fill: false
+        }).addTo(map).on('click', () => focusGroup(key));
+      });
+    });
+
+    GROUP_ORDER.forEach(key => {
+      const gi = GROUP_LOCATIONS[key];
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:26px;height:26px;border-radius:50% 50% 50% 0;
+          background:${gi.color}; transform:rotate(-45deg);
+          border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.35);
+        "></div>`,
+        iconSize: [26,26],
+        iconAnchor: [13,26]
+      });
+      const marker = L.marker([gi.lat, gi.lon], { icon }).addTo(map);
+      marker.on('click', () => focusGroup(key));
+      mapMarkers[key] = marker;
+    });
+  }
+
+  function popupHtmlFor(key){
+    const gi = GROUP_LOCATIONS[key];
+    const members = state.records.filter(r => r.numero_grupo === key);
+    const informed = members.filter(isInformed).length;
+    return `
+      <div class="popup-title">${esc(key)} · ${esc(gi.place)}</div>
+      <div class="popup-stats">${members.length} publicador${members.length===1?"":"es"} · ${informed}/${members.length} informado${informed===1?"":"s"}</div>
+      <a class="popup-link" href="#" onclick="window.__focusGroup('${key}');return false;">Ver fichas de este grupo →</a>
+    `;
+  }
+
+  window.__focusGroup = function(key){ focusGroup(key); };
+
+  function focusGroup(key){
+    state.grupoFilter = key;
+    state.groupBy = "ninguno";
+    state.showAllCards = true;
+    document.getElementById("group-by-select").value = "ninguno";
+    setActiveView("fichero");
+    const filtered = getFiltered();
+    if(filtered[0]) state.selectedId = filtered[0].id;
+    render();
+  }
+
+  function renderMap(){
+    ensureMap();
+    GROUP_ORDER.forEach(key => {
+      const marker = mapMarkers[key];
+      if(!marker) return;
+      marker.bindPopup(popupHtmlFor(key));
+    });
+    rebuildIndividualMarkers();
+    // fix rendering size issues when the tab becomes visible
+    setTimeout(() => { if(map) map.invalidateSize(); }, 50);
+  }
+
+  // coloca un punto por cada publicador, disperso DENTRO del polígono real
+  // de su grupo (no apilados en el centro). La posición es estable (mismo
+  // id → mismo lugar) para que no "salten" al refrescar los datos.
+  function hashStr(s){
+    let h = 0;
+    for(let i = 0; i < s.length; i++){ h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+    return h >>> 0;
+  }
+  function mulberry32(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function pointInRing(lat, lon, ring){
+    let inside = false;
+    for(let i = 0, j = ring.length - 1; i < ring.length; j = i++){
+      const yi = ring[i][0], xi = ring[i][1];
+      const yj = ring[j][0], xj = ring[j][1];
+      const intersects = ((yi > lat) !== (yj > lat)) &&
+        (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+      if(intersects) inside = !inside;
+    }
+    return inside;
+  }
+  function pointInGroupPolygon(lat, lon, key){
+    const parts = GROUP_BOUNDARIES[key];
+    if(!parts) return false;
+    return parts.some(part => pointInRing(lat, lon, part));
+  }
+  const groupBboxCache = {};
+  function bboxForGroup(key){
+    if(groupBboxCache[key]) return groupBboxCache[key];
+    const parts = GROUP_BOUNDARIES[key];
+    if(!parts) return null;
+    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    parts.forEach(part => part.forEach(([lat, lon]) => {
+      if(lat < minLat) minLat = lat;
+      if(lat > maxLat) maxLat = lat;
+      if(lon < minLon) minLon = lon;
+      if(lon > maxLon) maxLon = lon;
+    }));
+    const box = { minLat, maxLat, minLon, maxLon };
+    groupBboxCache[key] = box;
+    return box;
+  }
+  function pointForRecord(r){
+    const key = r.numero_grupo;
+    const gi = GROUP_LOCATIONS[key];
+    if(!gi) return null;
+    const bbox = bboxForGroup(key);
+    if(!bbox) return [gi.lat, gi.lon];
+    const rng = mulberry32(hashStr(String(r.id)) ^ hashStr(key));
+    for(let attempt = 0; attempt < 60; attempt++){
+      const lat = bbox.minLat + rng() * (bbox.maxLat - bbox.minLat);
+      const lon = bbox.minLon + rng() * (bbox.maxLon - bbox.minLon);
+      if(pointInGroupPolygon(lat, lon, key)) return [lat, lon];
+    }
+    return [gi.lat, gi.lon]; // no cupo tras varios intentos: usa el centro
+  }
+  function rebuildIndividualMarkers(){
+    if(!map) return;
+    if(individualLayer) map.removeLayer(individualLayer);
+    individualLayer = L.layerGroup().addTo(map);
+    state.records.forEach(r => {
+      const gi = groupInfo(r);
+      if(!gi) return;
+      const pt = pointForRecord(r);
+      if(!pt) return;
+      const informed = isInformed(r);
+      const dot = L.circleMarker(pt, {
+        radius: 6,
+        weight: 2,
+        color: "#fff",
+        fillColor: informed ? gi.color : "#E15B41",
+        fillOpacity: 0.95
+      }).addTo(individualLayer);
+      dot.bindTooltip(esc(r.nombre_publicador), { direction: "top", offset: [0, -6] });
+      dot.on("click", () => {
+        state.selectedId = r.id;
+        state.showAllCards = false;
+        setActiveView("fichero");
+        render();
+      });
+    });
+  }
+
+  function renderLegend(){
+    const el = document.getElementById("legend-list");
+    el.innerHTML = GROUP_ORDER.map(key => {
+      const gi = GROUP_LOCATIONS[key];
+      const members = state.records.filter(r => r.numero_grupo === key);
+      const informed = members.filter(isInformed).length;
+      return `
+        <div class="legend-item" data-grupo="${esc(key)}">
+          <span class="legend-dot" style="background:${gi.color}"></span>
+          <span class="legend-text">
+            <span class="legend-name">${esc(key)} · ${esc(gi.place)}</span>
+            <span class="legend-sub">${members.length} publicador${members.length===1?"":"es"} · ${informed}/${members.length} informado${informed===1?"":"s"}</span>
+          </span>
+        </div>
+      `;
+    }).join("");
+    el.querySelectorAll(".legend-item").forEach(item => {
+      item.addEventListener("click", () => {
+        const key = item.getAttribute("data-grupo");
+        const gi = GROUP_LOCATIONS[key];
+        if(map){
+          map.flyTo([gi.lat, gi.lon], 16, { duration: 0.6 });
+          mapMarkers[key].openPopup();
+        }
+      });
+    });
+  }
+
+  function renderDataTable(){
+    const rows = getFiltered();
+    const table = document.getElementById("data-table");
+    document.getElementById("data-table-count").textContent =
+      `${rows.length} fila${rows.length===1?"":"s"}`;
+
+    const headers = [
+      "#","Nombre del publicador","Número de grupo","Zona","Teléfono del publicador","Correo del publicador",
+      "Nombre del contacto de emergencia","Relación con el publicador","Teléfono del contacto",
+      "Teléfono alternativo","Correo del contacto","Estado","Datos incompletos","Fecha de envío"
+    ];
+
+    if(rows.length === 0){
+      table.innerHTML = `<thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead>
+        <tbody><tr><td colspan="${headers.length}" class="cell-muted">Sin datos para mostrar.</td></tr></tbody>`;
+      return;
+    }
+
+    const bodyRows = rows.map((r,i) => {
+      const gi = groupInfo(r);
+      const informed = isInformed(r);
+      const missing = missingFields(r).map(f=>f.label).join(", ") || "Ninguno";
+      return `<tr>
+        <td>${i+1}</td>
+        <td>${esc(r.nombre_publicador)}</td>
+        <td>${esc(r.numero_grupo) || '<span class="cell-muted">—</span>'}</td>
+        <td>${gi ? esc(gi.place) : '<span class="cell-muted">—</span>'}</td>
+        <td>${esc(r.telefono_publicador) || '<span class="cell-muted">—</span>'}</td>
+        <td>${esc(r.correo_publicador) || '<span class="cell-muted">—</span>'}</td>
+        <td>${esc(r.nombre_contacto) || '<span class="cell-muted">—</span>'}</td>
+        <td>${esc(r.relacion) || '<span class="cell-muted">—</span>'}</td>
+        <td>${esc(r.telefono_contacto) || '<span class="cell-muted">—</span>'}</td>
+        <td>${esc(r.telefono_alt) || '<span class="cell-muted">—</span>'}</td>
+        <td>${esc(r.correo_contacto) || '<span class="cell-muted">—</span>'}</td>
+        <td><span class="badge ${informed?'ok':'pending'}">${informed?'Informado':'Pendiente'}</span></td>
+        <td>${esc(missing)}</td>
+        <td>${r.fecha ? esc(formatDate(r.fecha)) : '<span class="cell-muted">—</span>'}</td>
+      </tr>`;
+    }).join("");
+
+    table.innerHTML = `<thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${bodyRows}</tbody>`;
+  }
+
+  // ---------- icons (inline svg, currentColor) ----------
+  function iconPhone(){ return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="vertical-align:-2px"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`; }
+  function iconMail(){ return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="vertical-align:-2px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`; }
+  function iconUser(){ return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="vertical-align:-2px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`; }
+  function iconUsers(size){ size = size || 13; return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`; }
+  function iconShieldCheck(){ return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`; }
+  function iconShieldAlert(){ return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`; }
+  function iconAlertShield(){ return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" style="vertical-align:-2px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`; }
+  function iconAlertTriangle(){ return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`; }
+  function iconWhatsApp(size){ size = size || 13; return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.52 0-10 4.48-10 10 0 1.77.46 3.45 1.27 4.9L2 22l5.25-1.38A9.95 9.95 0 0 0 12.04 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm5.78 14.24c-.24.68-1.4 1.3-1.94 1.38-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.79-4.16-4.94-4.36-.14-.2-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.26-.28.58-.35.77-.35.19 0 .39 0 .56.01.18.01.42-.07.66.5.24.58.83 1.99.9 2.13.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.16-.29.36-.42.49-.14.14-.28.29-.12.57.16.28.72 1.19 1.55 1.93 1.07.95 1.97 1.25 2.25 1.39.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.18-.28.37-.23.62-.14.26.09 1.63.77 1.91.91.28.14.46.21.53.33.07.12.07.68-.17 1.36z"/></svg>`; }
+  function iconMailSmall(size){ size = size || 13; return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`; }
+  function iconPhoneSmall(size){ size = size || 13; return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`; }
+
+  // ---------- view tabs ----------
+  function setActiveView(view){
+    state.activeView = view;
+    document.querySelectorAll(".view-tab").forEach(t => t.classList.toggle("active", t.getAttribute("data-view") === view));
+    document.getElementById("view-fichero").classList.toggle("active", view === "fichero");
+    document.getElementById("view-mapa").classList.toggle("active", view === "mapa");
+    if(view === "mapa"){ ensureMap(); setTimeout(() => map && map.invalidateSize(), 60); }
+  }
+  document.querySelectorAll(".view-tab").forEach(btn => {
+    btn.addEventListener("click", () => setActiveView(btn.getAttribute("data-view")));
+  });
+
+  // ---------- events ----------
+  document.getElementById("search-input").addEventListener("input", (e) => {
+    state.query = e.target.value;
+    renderStats();
+    renderList();
+    renderDataTable();
+  });
+
+  document.getElementById("filter-row").addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-chip");
+    if(!btn) return;
+    document.querySelectorAll(".filter-chip").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.statusFilter = btn.getAttribute("data-filter");
+    renderStats();
+    renderList();
+    renderDataTable();
+  });
+
+  document.getElementById("group-by-select").addEventListener("change", (e) => {
+    state.groupBy = e.target.value;
+    renderList();
+  });
+
+  document.getElementById("grupo-filter-clear").addEventListener("click", () => {
+    state.grupoFilter = null;
+    renderStats();
+    renderList();
+    renderLegend();
+    renderDataTable();
+    renderGrupoChips();
+  });
+
+  document.getElementById("print-btn").addEventListener("click", () => window.print());
+
+  document.getElementById("toggle-all-btn").addEventListener("click", () => {
+    state.showAllCards = !state.showAllCards;
+    renderCard();
+  });
+
+  document.getElementById("print-all-btn").addEventListener("click", () => {
+    const rows = getFiltered();
+    if(rows.length === 0) return;
+    document.getElementById("print-all-container").innerHTML = rows.map(compactCardHtml).join("");
+    document.body.classList.add("print-all");
+    window.print();
+  });
+  window.addEventListener("afterprint", () => {
+    document.body.classList.remove("print-all");
+  });
+
+  render();
+})();
+</script>
+<script>
+  // Registra el Service Worker para que la app cargue aunque no haya
+  // internet (usa la última versión guardada en el celular).
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
